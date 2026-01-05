@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  factorio:
+    image: factoriotools/factorio:stable
+    container_name: factorio
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:34197:34197/udp"
+      - "127.0.0.1:27015:27015/tcp"
+    volumes:
+      - ./scripts/factorio-volume:/factorio
+    environment:
+      # Disable Space Age DLC
+      - DLC_SPACE_AGE=false
+      # Optional: Set RCON password via environment (if not using rconpw file)
+      # - RCON_PASSWORD=SOMEPASSWORD
+      # Optional: Load latest save on startup
+      - LOAD_LATEST_SAVE=true
+      # Optional: Generate new save if none exists
+      - GENERATE_NEW_SAVE=true
+      # Optional: Set save name
+      # - SAVE_NAME=_autosave1
+    # Health check to ensure server is running
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 5 bash -c '</dev/tcp/127.0.0.1/27015' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

@@ -1,4 +1,4 @@
-.PHONY: help build build-clean setup sync run clean clean-tf clean-all terraform-init terraform-plan terraform-apply terraform-destroy tf stop
+.PHONY: help build build-clean setup sync run run-detached clean clean-tf clean-all terraform-init terraform-plan terraform-apply terraform-destroy tf stop disable-dlc
 
 # Default target
 .DEFAULT_GOAL := build
@@ -66,33 +66,66 @@ sync: ## Sync mod to Factorio installation (local or remote via SYNC_HOST/SYNC_P
 setup: sync ## Set up Factorio server (copy mods, create volume, configure RCON)
 	@echo "Setting up Factorio server..."
 	@echo "Creating server volume directory..."
-	@if [ -d "$(FACTORIO_VOLUME)" ]; then \
-		echo "Fixing ownership of factorio-volume directory (may require sudo)..."; \
-		sudo chown -R $$(whoami):$$(whoami) $(FACTORIO_VOLUME) 2>/dev/null || true; \
-	fi
 	@mkdir -p $(FACTORIO_VOLUME)/config
-	@if [ -d "$(FACTORIO_VOLUME)/mods" ]; then \
-		echo "Removing existing mods directory..."; \
-		rm -rf $(FACTORIO_VOLUME)/mods 2>/dev/null || sudo rm -rf $(FACTORIO_VOLUME)/mods; \
-	fi
+	@mkdir -p $(FACTORIO_VOLUME)/saves
 	@mkdir -p $(FACTORIO_VOLUME)/mods
+	@echo "Fixing ownership of volume directories (if needed)..."
+	@if [ ! -w "$(FACTORIO_VOLUME)" ]; then \
+		sudo chown -R $$(id -u):$$(id -g) $(FACTORIO_VOLUME) 2>/dev/null || true; \
+	fi
+	@if [ -d "$(FACTORIO_VOLUME)/mods/terraform-crud-api" ]; then \
+		echo "Removing existing mod directory..."; \
+		rm -rf $(FACTORIO_VOLUME)/mods/terraform-crud-api 2>/dev/null || \
+		(sudo rm -rf $(FACTORIO_VOLUME)/mods/terraform-crud-api 2>/dev/null || \
+		echo "Warning: Could not remove existing mod directory. Continuing anyway..."); \
+	fi
 	@echo "Copying mod to server mods directory..."
-	@cp -r $(MOD_DIR) $(FACTORIO_VOLUME)/mods/
+	@cp -r $(MOD_DIR) $(FACTORIO_VOLUME)/mods/ || \
+	(sudo cp -r $(MOD_DIR) $(FACTORIO_VOLUME)/mods/ || \
+	(echo "Error: Could not copy mod directory. Please check permissions." && exit 1))
+	@echo "Removing existing saves (they may have DLC mods enabled)..."
+	@rm -f $(FACTORIO_VOLUME)/saves/*.zip 2>/dev/null || true
+	@echo "Creating mod-list.json to disable DLC mods..."
+	@printf '{\n  "mods": [\n    {"name": "base", "enabled": true},\n    {"name": "terraform-crud-api", "enabled": true},\n    {"name": "space-age", "enabled": false},\n    {"name": "elevated-rails", "enabled": false},\n    {"name": "quality", "enabled": false}\n  ]\n}\n' > $(FACTORIO_VOLUME)/mods/mod-list.json
 	@echo "$(RCON_PW)" > $(FACTORIO_VOLUME)/config/rconpw
+	@echo "Creating server-settings.json..."
+	@if [ ! -f "$(FACTORIO_VOLUME)/config/server-settings.json" ]; then \
+		printf '{\n  "name": "Terraform Provider Factorio Server",\n  "description": "Server for testing terraform-provider-factorio",\n  "tags": ["terraform", "testing"],\n  "max_players": 0,\n  "visibility": {\n    "public": false,\n    "lan": true\n  },\n  "username": "",\n  "password": "",\n  "token": "",\n  "game_password": "",\n  "require_user_verification": false,\n  "max_upload_in_kilobytes_per_second": 0,\n  "max_upload_slots": 5,\n  "minimum_latency_in_ticks": 0,\n  "max_heartbeats_per_second": 60,\n  "ignore_player_limit_for_returning_players": false,\n  "allow_commands": "admins-only",\n  "autosave_interval": 10,\n  "autosave_slots": 5,\n  "afk_autokick_interval": 0,\n  "auto_pause": true,\n  "auto_pause_when_players_connect": false,\n  "only_admins_can_pause_the_game": true,\n  "autosave_only_on_server": true,\n  "non_blocking_saving": false,\n  "minimum_segment_size": 25,\n  "minimum_segment_size_peer_count": 20,\n  "maximum_segment_size": 100,\n  "maximum_segment_size_peer_count": 10\n}\n' > $(FACTORIO_VOLUME)/config/server-settings.json; \
+	fi
+	@echo "DLC mods (space-age, elevated-rails, quality) are now disabled in mod-list.json"
 	@echo "Setup complete!"
 	@echo ""
 	@echo "To start the server, run: make run"
 	@echo "To connect your client, use: 127.0.0.1:34197"
 
-run: setup ## Start the Factorio server in Docker
-	@echo "Starting Factorio server..."
+run: setup ## Start the Factorio server using docker compose (foreground)
+	@echo "Starting Factorio server with docker compose..."
 	@echo "Server accessible on: 0.0.0.0:34197 (all network interfaces)"
 	@echo "Connect your client to: $(shell hostname -I | awk '{print $$1}'):34197 or 127.0.0.1:34197"
-	@docker run -it -p 0.0.0.0:34197:34197/udp -p 0.0.0.0:27015:27015/tcp -v "$(shell pwd)/$(FACTORIO_VOLUME):/factorio" factoriotools/factorio:latest
+	@echo ""
+	@RCON_PASSWORD=$(RCON_PW) docker compose up
+
+run-detached: setup ## Start the Factorio server using docker compose (detached/background)
+	@echo "Starting Factorio server with docker compose in detached mode..."
+	@echo "Server accessible on: 0.0.0.0:34197 (all network interfaces)"
+	@echo "Connect your client to: $(shell hostname -I | awk '{print $$1}'):34197 or 127.0.0.1:34197"
+	@echo ""
+	@RCON_PASSWORD=$(RCON_PW) docker compose up -d
+	@echo "Server started in background. Use 'make stop' to stop it or 'docker compose logs -f' to view logs."
 
 stop: ## Stop running Factorio containers
 	@echo "Stopping Factorio containers..."
-	@docker ps -q --filter ancestor=factoriotools/factorio:latest | xargs -r docker stop
+	@docker compose down
+
+disable-dlc: ## Disable DLC mods in mod-list.json (run after server starts)
+	@echo "Disabling DLC mods in mod-list.json..."
+	@if [ -f "$(FACTORIO_VOLUME)/mods/mod-list.json" ]; then \
+		printf '{\n  "mods": [\n    {"name": "base", "enabled": true},\n    {"name": "terraform-crud-api", "enabled": true},\n    {"name": "space-age", "enabled": false},\n    {"name": "elevated-rails", "enabled": false},\n    {"name": "quality", "enabled": false}\n  ]\n}\n' > $(FACTORIO_VOLUME)/mods/mod-list.json; \
+		echo "DLC mods disabled. Restart the server for changes to take effect."; \
+	else \
+		echo "Error: mod-list.json not found. Run 'make setup' first."; \
+		exit 1; \
+	fi
 
 clean-tf: ## Remove Terraform state files
 	@echo "Removing Terraform state files..."
@@ -105,7 +138,10 @@ clean-all: clean-tf ## Remove all generated files (Terraform state, client mod, 
 	@echo "Removing local client mod..."
 	@rm -rf "$(FACTORIO_MODS_DIR)/terraform-crud-api"
 	@echo "Removing server persistent volume..."
-	@rm -rf $(FACTORIO_VOLUME)
+	@if [ -d "$(FACTORIO_VOLUME)" ]; then \
+		echo "Removing server volume..."; \
+		rm -rf $(FACTORIO_VOLUME) 2>/dev/null || (echo "Warning: Some files may have been created by Docker container. Trying with sudo..."; sudo rm -rf $(FACTORIO_VOLUME) 2>/dev/null || echo "Note: Some files may require manual cleanup."); \
+	fi
 	@echo "Cleanup complete!"
 
 clean: clean-all ## Alias for clean-all
