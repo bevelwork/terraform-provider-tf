@@ -9,7 +9,15 @@ ifeq ($(UNAME_S),Linux)
 	FACTORIO_MODS_DIR := $(HOME)/.factorio/mods
 else ifeq ($(UNAME_S),Darwin)
 	FACTORIO_MODS_DIR := $(HOME)/Library/Application Support/factorio/mods
+else ifneq ($(filter MINGW% MSYS% CYGWIN%,$(UNAME_S)),)
+	# Windows (Git Bash, MSYS2, Cygwin)
+	ifeq ($(APPDATA),)
+		FACTORIO_MODS_DIR := $(HOME)/AppData/Roaming/Factorio/mods
+	else
+		FACTORIO_MODS_DIR := $(APPDATA)/Factorio/mods
+	endif
 else
+	# Default fallback (may need manual override)
 	FACTORIO_MODS_DIR := $(HOME)/.factorio/mods
 endif
 
@@ -60,7 +68,10 @@ sync: ## Sync mod to Factorio installation (local or remote via SYNC_HOST/SYNC_P
 		rm -rf "$(FACTORIO_MODS_DIR)/terraform-crud-api"; \
 		echo "Copying mod to client mods folder..."; \
 		cp -r $(MOD_DIR) "$(FACTORIO_MODS_DIR)/"; \
+		echo "Creating mod-list.json to match server configuration..."; \
+		printf '{\n  "mods": [\n    {"name": "base", "enabled": true},\n    {"name": "terraform-crud-api", "enabled": true},\n    {"name": "space-age", "enabled": false},\n    {"name": "elevated-rails", "enabled": false},\n    {"name": "quality", "enabled": false}\n  ]\n}\n' > "$(FACTORIO_MODS_DIR)/mod-list.json"; \
 		echo "Mod synced successfully to $(FACTORIO_MODS_DIR)/terraform-crud-api"; \
+		echo "Client mod-list.json updated to match server configuration"; \
 	fi
 
 sync-server: ## Sync mod to the Factorio server (Docker volume)
