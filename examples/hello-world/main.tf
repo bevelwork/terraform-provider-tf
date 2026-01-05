@@ -98,8 +98,8 @@ resource "factorio_entity" "hello_belt" {
     for player_index, player in data.factorio_players.all.players : {
       for belt_key, belt_value in local.belt_map :
       "${player_index}_${belt_key}" => {
-        x = belt_value.x + local.offset_x + player.position.0.x
-        y = belt_value.y + local.offset_y + player.position.0.y
+        x = belt_value.x + local.offset_x + player.position[0].x
+        y = belt_value.y + local.offset_y + player.position[0].y
       }
     }
   ]...)
