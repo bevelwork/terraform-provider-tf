@@ -1,4 +1,4 @@
-.PHONY: help build build-clean setup sync run run-detached clean clean-tf clean-all terraform-init terraform-plan terraform-apply terraform-destroy tf stop disable-dlc
+.PHONY: help build build-clean setup sync sync-server sync-all pull run run-detached clean clean-tf clean-all terraform-init terraform-plan terraform-apply terraform-destroy tf stop disable-dlc
 
 # Default target
 .DEFAULT_GOAL := build
@@ -62,6 +62,54 @@ sync: ## Sync mod to Factorio installation (local or remote via SYNC_HOST/SYNC_P
 		cp -r $(MOD_DIR) "$(FACTORIO_MODS_DIR)/"; \
 		echo "Mod synced successfully to $(FACTORIO_MODS_DIR)/terraform-crud-api"; \
 	fi
+
+sync-server: ## Sync mod to the Factorio server (Docker volume)
+	@echo "Syncing mod to Factorio server..."
+	@if [ ! -d "$(FACTORIO_VOLUME)" ]; then \
+		echo "Error: Server volume directory not found: $(FACTORIO_VOLUME)"; \
+		echo "Run 'make setup' first to create the server volume."; \
+		exit 1; \
+	fi
+	@mkdir -p "$(FACTORIO_VOLUME)/mods"
+	@if [ -d "$(FACTORIO_VOLUME)/mods/terraform-crud-api" ]; then \
+		echo "Removing existing mod from server..."; \
+		rm -rf $(FACTORIO_VOLUME)/mods/terraform-crud-api 2>/dev/null || \
+		(sudo rm -rf $(FACTORIO_VOLUME)/mods/terraform-crud-api 2>/dev/null || \
+		echo "Warning: Could not remove existing mod directory. Continuing anyway..."); \
+	fi
+	@echo "Copying mod to server mods directory..."
+	@cp -r $(MOD_DIR) $(FACTORIO_VOLUME)/mods/ || \
+	(sudo cp -r $(MOD_DIR) $(FACTORIO_VOLUME)/mods/ || \
+	(echo "Error: Could not copy mod directory. Please check permissions." && exit 1))
+	@echo "Mod synced successfully to $(FACTORIO_VOLUME)/mods/terraform-crud-api"
+	@echo ""
+	@echo "Note: Restart the server for changes to take effect: make stop && make run"
+	@echo "      Or reload mods via RCON: /c game.reload_mods()"
+
+sync-all: sync sync-server ## Sync mod to both client and server
+	@echo ""
+	@echo "✓ Mod synced to both client and server!"
+
+pull: ## Pull mods from server to client (spiff:/home/spiff/dev/bevel/terraform-provider-factorio)
+	@echo "Pulling mods from server to client..."
+	@echo "Server: spiff"
+	@echo "Source: /home/spiff/dev/bevel/terraform-provider-factorio/examples/hello-world/scripts/factorio-volume/mods"
+	@echo "Detected OS: $(UNAME_S)"
+	@echo "Factorio mods directory: $(FACTORIO_MODS_DIR)"
+	@mkdir -p "$(FACTORIO_MODS_DIR)"
+	@echo "Removing existing mod (if present)..."
+	@rm -rf "$(FACTORIO_MODS_DIR)/terraform-crud-api"
+	@echo "Pulling mod from server..."
+	@if command -v rsync >/dev/null 2>&1; then \
+		rsync -avz --delete spiff:/home/spiff/dev/bevel/terraform-provider-factorio/examples/hello-world/scripts/factorio-volume/mods/terraform-crud-api/ "$(FACTORIO_MODS_DIR)/terraform-crud-api/" || \
+		(echo "rsync failed, trying scp..." && \
+		scp -r spiff:/home/spiff/dev/bevel/terraform-provider-factorio/examples/hello-world/scripts/factorio-volume/mods/terraform-crud-api "$(FACTORIO_MODS_DIR)/"); \
+	else \
+		scp -r spiff:/home/spiff/dev/bevel/terraform-provider-factorio/examples/hello-world/scripts/factorio-volume/mods/terraform-crud-api "$(FACTORIO_MODS_DIR)/"; \
+	fi
+	@echo "Mod pulled successfully to $(FACTORIO_MODS_DIR)/terraform-crud-api"
+	@echo ""
+	@echo "Note: Restart Factorio client or reload mods: /c game.reload_mods()"
 
 setup: sync ## Set up Factorio server (copy mods, create volume, configure RCON)
 	@echo "Setting up Factorio server..."
