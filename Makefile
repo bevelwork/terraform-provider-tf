@@ -205,13 +205,17 @@ clean-all: clean-tf ## Remove all generated files (Terraform state, client mod, 
 
 clean: clean-all ## Alias for clean-all
 
-terraform-init: ## Initialize Terraform
-	@cd $(EXAMPLE_DIR) && terraform init
+terraform-init: ## Initialize Terraform (use terraform-get for dev overrides)
+	@cd $(EXAMPLE_DIR) && terraform get || terraform init
 
-terraform-plan: ## Run Terraform plan
+terraform-get: ## Get/update Terraform modules (works with dev overrides, no provider download needed)
+	@cd $(EXAMPLE_DIR) && terraform get -update
+	@echo "Note: With dev overrides, 'terraform validate' may fail, but 'terraform plan' and 'terraform apply' will work."
+
+terraform-plan: terraform-get ## Run Terraform plan (works with dev overrides)
 	@cd $(EXAMPLE_DIR) && terraform plan
 
-terraform-apply: ## Apply Terraform configuration
+terraform-apply: terraform-get ## Apply Terraform configuration (works with dev overrides)
 	@cd $(EXAMPLE_DIR) && terraform apply -auto-approve
 
 terraform-destroy: ## Destroy Terraform resources

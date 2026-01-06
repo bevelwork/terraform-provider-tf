@@ -1,12 +1,3 @@
-terraform {
-  required_providers {
-    factorio = {
-      version = "~> 0.1"
-      source  = "efokschaner/factorio"
-    }
-  }
-}
-
 locals {
   // Offsets place the text with the center
   offset_x = -23

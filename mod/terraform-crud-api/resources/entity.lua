@@ -245,16 +245,27 @@ return {
     }
     local existing_entities = surface.find_entities_filtered({area = area})
     
-    -- Helper function to check if an entity is a crash-site entity (can be auto-cleared)
-    local function is_crash_site_entity(entity)
+    -- Helper function to check if an entity should be auto-cleared (crash-site entities, trees, etc.)
+    local function should_auto_clear_entity(entity)
       local name = entity.name
-      return string.sub(name, 1, 11) == "crash-site-"
+      -- Crash-site entities
+      if string.sub(name, 1, 11) == "crash-site-" then
+        return true
+      end
+      -- Trees (tree-01, tree-02, tree-03, tree-04, dry-tree, dead-grey-trunk, etc.)
+      if string.sub(name, 1, 5) == "tree-" then
+        return true
+      end
+      if name == "dry-tree" or name == "dead-grey-trunk" then
+        return true
+      end
+      return false
     end
     
     -- First, check if there's a matching entity we can reuse
     local matching_entity = nil
     local conflicting_entities = {}
-    local crash_site_entities = {}
+    local auto_clear_entities = {}
     for _, existing_entity in pairs(existing_entities) do
       if existing_entity.valid then
         -- Check if this entity matches what we're trying to create
@@ -263,9 +274,9 @@ return {
           matching_entity = existing_entity
           -- Make sure it's in resource_db
           resource_db.put('entity', existing_entity.unit_number, existing_entity)
-        elseif is_crash_site_entity(existing_entity) then
-          -- Crash site entity - can be auto-cleared
-          table.insert(crash_site_entities, existing_entity)
+        elseif should_auto_clear_entity(existing_entity) then
+          -- Entity that should be auto-cleared (crash-site, trees, etc.)
+          table.insert(auto_clear_entities, existing_entity)
         else
           -- Different entity type - this is a conflict
           table.insert(conflicting_entities, existing_entity)
@@ -290,16 +301,16 @@ return {
       return entity_to_resource(matching_entity)
     end
     
-    -- Auto-clear crash site entities
-    for _, crash_entity in pairs(crash_site_entities) do
-      if crash_entity.valid then
+    -- Auto-clear entities that should be removed (crash-site, trees, etc.)
+    for _, clear_entity in pairs(auto_clear_entities) do
+      if clear_entity.valid then
         -- Remove from resource_db if it's tracked
-        local unit_number = crash_entity.unit_number
+        local unit_number = clear_entity.unit_number
         if resource_db.get('entity', unit_number) ~= nil then
           resource_db.put('entity', unit_number, nil)
         end
-        -- Destroy the crash site entity
-        crash_entity.destroy()
+        -- Destroy the entity
+        clear_entity.destroy()
       end
     end
     
