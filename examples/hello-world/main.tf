@@ -43,6 +43,23 @@ resource "factorio_entity" "a-ghost-furnace" {
   }
 }
 
+# Example of creating an entity with contents (burner mining drill with wood fuel)
+resource "factorio_entity" "burner_mining_drill" {
+  surface = "nauvis"
+  name    = "burner-mining-drill"
+  position {
+    x = 5
+    y = 2
+  }
+  direction = "north"
+  force     = "player"
+  
+  contents {
+    kind = "wood"
+    qty  = 50
+  }
+}
+
 // Example of using a Factorio infrastructure module (inlined)
 locals {
   // Offsets place the text with the center

@@ -61,6 +61,25 @@ func resourceEntity() *schema.Resource {
 				Description: "A map of additional entity-specific parameters to be passed to create_entity (https://lua-api.factorio.com/latest/LuaSurface.html#LuaSurface.create_entity)",
 				ForceNew:    true,
 			},
+			"contents": {
+				Type:        schema.TypeList,
+				Optional:    true,
+				Description: "Items to place inside the entity (e.g., fuel in a burner mining drill)",
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"kind": {
+							Type:        schema.TypeString,
+							Required:    true,
+							Description: "The item name (e.g., 'wood', 'coal')",
+						},
+						"qty": {
+							Type:        schema.TypeInt,
+							Required:    true,
+							Description: "The quantity of the item",
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -74,18 +93,92 @@ func resourceEntityCreate(ctx context.Context, d *schema.ResourceData, m interfa
 		return diag.FromErr(err)
 	}
 
-	opts.Surface = d.Get("surface").(string)
-	opts.Name = d.Get("name").(string)
-	opts.Position.X = float32(d.Get("position.0.x").(float64))
-	opts.Position.Y = float32(d.Get("position.0.y").(float64))
-	opts.Direction = direction
-	opts.Force = d.Get("force").(string)
-	opts.EntitySpecificParameters = d.Get("entity_specific_parameters").(map[string]interface{})
+	surface := d.Get("surface").(string)
+	name := d.Get("name").(string)
+	position := client.Position{
+		X: float32(d.Get("position.0.x").(float64)),
+		Y: float32(d.Get("position.0.y").(float64)),
+	}
+	force := d.Get("force").(string)
+	
+	// Extract contents
+	var contents []client.Content
+	if contentsList, ok := d.Get("contents").([]interface{}); ok && len(contentsList) > 0 {
+		contents = make([]client.Content, 0, len(contentsList))
+		for _, contentItem := range contentsList {
+			contentMap := contentItem.(map[string]interface{})
+			contents = append(contents, client.Content{
+				Kind: contentMap["kind"].(string),
+				Qty:  contentMap["qty"].(int),
+			})
+		}
+	}
 
-	e, err := c.EntityCreate(&opts)
+	// Check if a resource with matching attributes already exists
+	// Match on surface, name, and position (key identifying attributes)
+	tolerance := float32(0.1) // 0.1 tile tolerance
+	query := &client.EntityQuery{
+		Surface:          &surface,
+		Name:             &name,
+		Position:         &position,
+		PositionTolerance: &tolerance,
+	}
+	
+	existing, err := c.EntityList(query)
 	if err != nil {
 		return diag.FromErr(err)
 	}
+	
+	var e *client.Entity
+	if len(existing) > 0 {
+		// Use the first matching entity
+		e = &existing[0]
+		// Update it if direction or force changed
+		var updateOpts client.EntityUpdateOptions
+		needsUpdate := false
+		
+		currentDirection := e.Direction.String()
+		desiredDirection := direction.String()
+		if currentDirection != desiredDirection {
+			updateOpts.Direction = &direction
+			needsUpdate = true
+		}
+		
+		if e.Force != force {
+			updateOpts.Force = &force
+			needsUpdate = true
+		}
+		
+		// Check if contents changed
+		if d.HasChange("contents") {
+			updateOpts.Contents = &contents
+			needsUpdate = true
+		}
+		
+		if needsUpdate {
+			updated, err := c.EntityUpdate(e.UnitNumber, &updateOpts)
+			if err != nil {
+				return diag.FromErr(err)
+			}
+			e = updated
+		}
+	} else {
+		// Create new entity
+		opts.Surface = surface
+		opts.Name = name
+		opts.Position = position
+		opts.Direction = direction
+		opts.Force = force
+		opts.EntitySpecificParameters = d.Get("entity_specific_parameters").(map[string]interface{})
+		opts.Contents = contents
+
+		created, err := c.EntityCreate(&opts)
+		if err != nil {
+			return diag.FromErr(err)
+		}
+		e = created
+	}
+	
 	d.SetId(e.UnitNumber.String())
 	return resourceEntityRead(ctx, d, m)
 }
@@ -104,6 +197,20 @@ func flattenPosition(pos client.Position) []map[string]float64 {
 	return []map[string]float64{flat}
 }
 
+func flattenContents(contents []client.Content) []map[string]interface{} {
+	if contents == nil {
+		return []map[string]interface{}{}
+	}
+	result := make([]map[string]interface{}, len(contents))
+	for i, content := range contents {
+		result[i] = map[string]interface{}{
+			"kind": content.Kind,
+			"qty":  content.Qty,
+		}
+	}
+	return result
+}
+
 func writeEntityToResourceData(e *client.Entity, d *schema.ResourceData) diag.Diagnostics {
 	var diags diag.Diagnostics
 	writeAttributeToResource(&diags, d, "unit_number", e.UnitNumber)
@@ -112,6 +219,7 @@ func writeEntityToResourceData(e *client.Entity, d *schema.ResourceData) diag.Di
 	writeAttributeToResource(&diags, d, "position", flattenPosition(e.Position))
 	writeAttributeToResource(&diags, d, "direction", e.Direction.String())
 	writeAttributeToResource(&diags, d, "force", e.Force)
+	writeAttributeToResource(&diags, d, "contents", flattenContents(e.Contents))
 	return diags
 }
 
@@ -151,6 +259,20 @@ func resourceEntityUpdate(ctx context.Context, d *schema.ResourceData, m interfa
 	if d.HasChange("force") {
 		force := d.Get("force").(string)
 		opts.Force = &force
+	}
+	if d.HasChange("contents") {
+		var contents []client.Content
+		if contentsList, ok := d.Get("contents").([]interface{}); ok && len(contentsList) > 0 {
+			contents = make([]client.Content, 0, len(contentsList))
+			for _, contentItem := range contentsList {
+				contentMap := contentItem.(map[string]interface{})
+				contents = append(contents, client.Content{
+					Kind: contentMap["kind"].(string),
+					Qty:  contentMap["qty"].(int),
+				})
+			}
+		}
+		opts.Contents = &contents
 	}
 	_, err = c.EntityUpdate(unitNumber, &opts)
 	if err != nil {

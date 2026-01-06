@@ -22,9 +22,12 @@ resources = {
 
 -- Factorio 2.0: game.table_to_json was removed, implement manual JSON serialization
 local function escape_string(str)
-  return string.gsub(str, '["\\]', {
+  return string.gsub(str, '["\\\n\r\t]', {
     ['"'] = '\\"',
     ['\\'] = '\\\\',
+    ['\n'] = '\\n',
+    ['\r'] = '\\r',
+    ['\t'] = '\\t',
   })
 end
 
@@ -51,8 +54,11 @@ local function serialize_value(value)
       end
     end
     
-    if is_array and max_index > 0 then
-      -- Serialize as array
+    if is_array then
+      -- Serialize as array (including empty arrays)
+      if max_index == 0 then
+        return '[]'
+      end
       local parts = {}
       for i = 1, max_index do
         table.insert(parts, serialize_value(value[i]))
@@ -241,6 +247,13 @@ exports = {
     return resources[resource_type].read(query)
   end,
 
+  list = function(resource_type, query)
+    if resources[resource_type].list == nil then
+      error(string.format('Resource type "%s" does not support list operation', resource_type))
+    end
+    return resources[resource_type].list(query)
+  end,
+
   create = function(resource_type, create_config)
     return resources[resource_type].create(create_config)
   end,
@@ -288,11 +301,22 @@ local function handle_rpc(request_string)
       _preserve_table = true
     }
   else
+    -- Sanitize error data to prevent JSON parsing issues
+    local sanitized_data = result
+    if type(result) == 'string' then
+      -- Replace newlines and carriage returns with spaces
+      sanitized_data = string.gsub(result, '\n', ' ')
+      sanitized_data = string.gsub(sanitized_data, '\r', ' ')
+      -- Limit length to prevent extremely long error messages
+      if #sanitized_data > 1000 then
+        sanitized_data = string.sub(sanitized_data, 1, 1000) .. '... (truncated)'
+      end
+    end
     return {
       error = {
         code = 500,
         message = string.format('Error during "%s"', request.method),
-        data = result
+        data = sanitized_data
       }
     }
   end

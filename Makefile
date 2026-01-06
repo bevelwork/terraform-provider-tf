@@ -97,9 +97,9 @@ sync-server: ## Sync mod to the Factorio server (Docker volume)
 	@echo "Note: Restart the server for changes to take effect: make stop && make run"
 	@echo "      Or reload mods via RCON: /c game.reload_mods()"
 
-sync-all: sync sync-server ## Sync mod to both client and server
+sync-all: build sync sync-server ## Build provider, sync mod to both client and server
 	@echo ""
-	@echo "✓ Mod synced to both client and server!"
+	@echo "✓ Provider built and mod synced to both client and server!"
 
 pull: ## Pull mods from server to client (spiff:/home/spiff/dev/bevel/terraform-provider-factorio)
 	@echo "Pulling mods from server to client..."

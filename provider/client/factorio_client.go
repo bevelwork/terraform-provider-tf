@@ -47,6 +47,10 @@ func (client *FactorioClient) Read(resource_type string, query interface{}, resu
 	return client.doCall(result_out, "read", resource_type, query)
 }
 
+func (client *FactorioClient) List(resource_type string, query interface{}, result_out interface{}) error {
+	return client.doCall(result_out, "list", resource_type, query)
+}
+
 func (client *FactorioClient) Create(resource_type string, create_config interface{}, result_out interface{}) error {
 	return client.doCall(result_out, "create", resource_type, create_config)
 }
