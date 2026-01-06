@@ -26,6 +26,10 @@ type Content struct {
 	Qty  int    `json:"qty"`
 }
 
+type Recipe struct {
+	Kind string `json:"kind"`
+}
+
 type Entity struct {
 	UnitNumber UnitNumber `json:"unit_number"`
 	Surface    string     `json:"surface"`
@@ -34,6 +38,7 @@ type Entity struct {
 	Direction  Direction  `json:"direction"`
 	Force      string     `json:"force"`
 	Contents   []Content  `json:"contents,omitempty"`
+	Recipe     *Recipe    `json:"recipe,omitempty"`
 }
 
 // Looks up an entity by its unit_number
@@ -92,6 +97,7 @@ type EntityCreateOptions struct {
 	Force                    string                 `json:"force"` // eg. "player", "enemy", "neutral"
 	EntitySpecificParameters map[string]interface{} `json:"entity_specific_parameters"`
 	Contents                 []Content              `json:"contents,omitempty"`
+	Recipe                   *Recipe                `json:"recipe,omitempty"`
 
 	// Unimplemented
 	/*
@@ -115,9 +121,10 @@ func (client *FactorioClient) EntityCreate(opts *EntityCreateOptions) (*Entity, 
 
 // All params are optional
 type EntityUpdateOptions struct {
-	Direction *Direction  `json:"direction,omitempty"`
-	Force     *string     `json:"force,omitempty"`
+	Direction *Direction `json:"direction,omitempty"`
+	Force     *string    `json:"force,omitempty"`
 	Contents  *[]Content `json:"contents,omitempty"`
+	Recipe    *Recipe    `json:"recipe,omitempty"`
 }
 
 func (client *FactorioClient) EntityUpdate(unitNumber UnitNumber, opts *EntityUpdateOptions) (*Entity, error) {

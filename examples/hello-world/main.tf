@@ -15,6 +15,95 @@ provider "factorio" {
 # Example of state fetching
 data "factorio_players" "all" {}
 
+
+# Example of using the full_chest module with for_each
+module "full_chests" {
+  source = "./modules/full_chest"
+
+  for_each = {
+    "iron-plates" = {
+      kind = "iron-plate"
+      x    = 30
+      y    = 0
+    }
+    "copper-plates" = {
+      kind = "copper-plate"
+      x    = 32
+      y    = 0
+    }
+    "steel-plates" = {
+      kind = "steel-plate"
+      x    = 34
+      y    = 0
+    }
+    "coal" = {
+      kind = "coal"
+      x    = 36
+      y    = 0
+    }
+  }
+
+  kind = each.value.kind
+  x    = each.value.x
+  y    = each.value.y
+}
+
+# 4 gun turrets with advanced ammo positioned around the current player
+resource "factorio_entity" "defense_turrets" {
+  for_each = merge([
+    for player_index, player in data.factorio_players.all.players : {
+      for direction, offset in {
+        "north" = { x = 0, y = -3 }
+        "south" = { x = 0, y = 3 }
+        "east"  = { x = 3, y = 0 }
+        "west"  = { x = -3, y = 0 }
+        } : "${player_index}_${direction}" => {
+        x = player.position[0].x + offset.x
+        y = player.position[0].y + offset.y
+      }
+    }
+  ]...)
+
+  surface = "nauvis"
+  name    = "gun-turret"
+  position {
+    x = each.value.x
+    y = each.value.y
+  }
+  direction = "north"
+  force     = "player"
+
+  # Load with advanced ammo (piercing rounds)
+  contents {
+    kind = "piercing-rounds-magazine"
+    qty  = 200 # Full stack of advanced ammo
+  }
+}
+
+# Example of assembly machine with recipe positioned above each player
+# resource "factorio_entity" "assembly_machine" {
+#   for_each = {
+#     for player_index, player in data.factorio_players.all.players :
+#     player_index => {
+#       x = player.position[0].x
+#       y = player.position[0].y - 2 # 2 tiles above the player
+#     }
+#   }
+# 
+#   surface = "nauvis"
+#   name    = "assembling-machine-1"
+#   position {
+#     x = each.value.x
+#     y = each.value.y
+#   }
+#   direction = "north"
+#   force     = "player"
+# 
+#   recipe {
+#     kind = "iron-gear-wheel"
+#   }
+# }
+
 # Example of resource creating
 # resource "factorio_entity" "a-furnace" {
 #   surface = "nauvis"
@@ -106,87 +195,35 @@ data "factorio_players" "all" {}
 # }
 # 
 # Example of using the coal extractor farm module
-module "coal_extractor_farm" {
-  source = "./modules/coal_extractor_farm"
-
-  direction = "north"
-  x         = 20
-  y         = 0
-  height    = 5  # 5 mining drills in a column
-  width     = 10 # 10 belt segments extending from each drill
+locals {
+  coal_extractor_locations = [
+    { x = -12, y = -110 },
+    { x = -7, y = -110 },
+    { x = -2, y = -110 },
+    { x = 2, y = -110 },
+    { x = 7, y = -110 },
+  ]
 }
-# 
-# // Example of using a Factorio infrastructure module (inlined)
-# locals {
-#   // Offsets place the text with the center
-#   offset_x = -23
-#   offset_y = -10
-#   text = [
-#     [
-#       "X  X  XXX  X    X     XX ",
-#       "X  X  X    X    X    X  X",
-#       "XXXX  XXX  X    X    X  X",
-#       "X  X  X    X    X    X  X",
-#       "X  X  XXX  XXX  XXX   XX ",
-#     ],
-#     [
-#       "XXX  XXX    XX   X   X",
-#       "X    X  X  X  X  XX XX",
-#       "XXX  XXX   X  X  X X X",
-#       "X    X X   X  X  X   X",
-#       "X    X  X   XX   X   X",
-#     ],
-#     [
-#       "XXX  XXX  XXX   XXX    XX   XXX   XX   XXX   X   X",
-#       " X   X    X  X  X  X  X  X  X    X  X  X  X  XX XX",
-#       " X   XXX  XXX   XXX   XXXX  XXX  X  X  XXX   X X X",
-#       " X   X    X X   X X   X  X  X    X  X  X X   X   X",
-#       " X   XXX  X  X  X  X  X  X  X     XX   X  X  X   X",
-#     ],
-#   ]
-# 
-#   flat_text = flatten([
-#     for text_line in local.text :
-#     # Add 3 empty lines between each text line
-#     concat(text_line, ["", "", ""])
-#   ])
-# 
-#   pixels = flatten([
-#     for pixel_line_index, pixel_line in local.flat_text : [
-#       for pixel_index, pixel in regexall(".", pixel_line) :
-#       {
-#         x = pixel_index
-#         y = pixel_line_index
-#       } if pixel == "X"
-#     ]
-#   ])
-# 
-#   belt_map = { for pixel in local.pixels :
-#     "_${pixel.x}_${pixel.y}" => pixel
-#   }
-# }
-# 
-# resource "factorio_entity" "hello_belt" {
-#   for_each = merge([
-#     for player_index, player in data.factorio_players.all.players : {
-#       for belt_key, belt_value in local.belt_map :
-#       "${player_index}_${belt_key}" => {
-#         x = belt_value.x + local.offset_x + player.position[0].x
-#         y = belt_value.y + local.offset_y + player.position[0].y
-#       }
-#     }
-#   ]...)
-#   surface = "nauvis"
-#   name    = "transport-belt"
-#   position {
-#     x = each.value.x
-#     y = each.value.y
-#   }
-#   direction = "east"
-#   force     = "player"
-# }
-# 
-# # 5 steel chests to the east of the hello world text
+
+module "coal_extractor_farm" {
+  for_each  = { for loc in local.coal_extractor_locations : "${loc.x}_${loc.y}" => loc }
+  source    = "./modules/coal_extractor_farm"
+  direction = "north"
+  x         = each.value.x
+  y         = each.value.y
+  height    = 25
+  width     = 10
+}
+
+# Power plant positioned 20 squares to the right of each player
+module "power_plant" {
+  source  = "./modules/power_plant_batch_1"
+  base_x  = 19.5
+  base_y  = 11.5
+  surface = "nauvis"
+  force   = "player"
+}
+
 # resource "factorio_entity" "steel_chests" {
 #   for_each = merge([
 #     for player_index, player in data.factorio_players.all.players : {

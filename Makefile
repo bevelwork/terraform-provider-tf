@@ -213,13 +213,13 @@ terraform-get: ## Get/update Terraform modules (works with dev overrides, no pro
 	@echo "Note: With dev overrides, 'terraform validate' may fail, but 'terraform plan' and 'terraform apply' will work."
 
 terraform-plan: terraform-get ## Run Terraform plan (works with dev overrides)
-	@cd $(EXAMPLE_DIR) && terraform plan
+	@cd $(EXAMPLE_DIR) terraform plan -parllelism=500
 
 terraform-apply: terraform-get ## Apply Terraform configuration (works with dev overrides)
-	@cd $(EXAMPLE_DIR) && terraform apply -auto-approve
+	@cd $(EXAMPLE_DIR) && terraform apply -auto-approve -parallelism=500
 
 terraform-destroy: ## Destroy Terraform resources
-	@cd $(EXAMPLE_DIR) && terraform destroy
+	@cd $(EXAMPLE_DIR) && terraform destroy -parallelism=500
 
 tf: terraform-plan terraform-apply ## Run full Terraform workflow (plan, apply)
 	@echo "Terraform workflow complete!"

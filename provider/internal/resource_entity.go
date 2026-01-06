@@ -80,6 +80,21 @@ func resourceEntity() *schema.Resource {
 					},
 				},
 			},
+			"recipe": {
+				Type:        schema.TypeList,
+				Optional:    true,
+				MaxItems:    1,
+				Description: "Recipe to set for crafting entities (e.g., assembly machines)",
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"kind": {
+							Type:        schema.TypeString,
+							Required:    true,
+							Description: "The recipe name (e.g., 'iron-gear-wheel', 'copper-cable')",
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -111,6 +126,15 @@ func resourceEntityCreate(ctx context.Context, d *schema.ResourceData, m interfa
 				Kind: contentMap["kind"].(string),
 				Qty:  contentMap["qty"].(int),
 			})
+		}
+	}
+
+	// Extract recipe
+	var recipe *client.Recipe
+	if recipeList, ok := d.Get("recipe").([]interface{}); ok && len(recipeList) > 0 {
+		recipeMap := recipeList[0].(map[string]interface{})
+		recipe = &client.Recipe{
+			Kind: recipeMap["kind"].(string),
 		}
 	}
 
@@ -155,6 +179,20 @@ func resourceEntityCreate(ctx context.Context, d *schema.ResourceData, m interfa
 			needsUpdate = true
 		}
 		
+		// Check if recipe changed (compare current vs desired)
+		currentRecipeKind := ""
+		if e.Recipe != nil {
+			currentRecipeKind = e.Recipe.Kind
+		}
+		desiredRecipeKind := ""
+		if recipe != nil {
+			desiredRecipeKind = recipe.Kind
+		}
+		if currentRecipeKind != desiredRecipeKind {
+			updateOpts.Recipe = recipe
+			needsUpdate = true
+		}
+		
 		if needsUpdate {
 			updated, err := c.EntityUpdate(e.UnitNumber, &updateOpts)
 			if err != nil {
@@ -171,6 +209,7 @@ func resourceEntityCreate(ctx context.Context, d *schema.ResourceData, m interfa
 		opts.Force = force
 		opts.EntitySpecificParameters = d.Get("entity_specific_parameters").(map[string]interface{})
 		opts.Contents = contents
+		opts.Recipe = recipe
 
 		created, err := c.EntityCreate(&opts)
 		if err != nil {
@@ -211,6 +250,17 @@ func flattenContents(contents []client.Content) []map[string]interface{} {
 	return result
 }
 
+func flattenRecipe(recipe *client.Recipe) []map[string]interface{} {
+	if recipe == nil {
+		return []map[string]interface{}{}
+	}
+	return []map[string]interface{}{
+		{
+			"kind": recipe.Kind,
+		},
+	}
+}
+
 func writeEntityToResourceData(e *client.Entity, d *schema.ResourceData) diag.Diagnostics {
 	var diags diag.Diagnostics
 	writeAttributeToResource(&diags, d, "unit_number", e.UnitNumber)
@@ -220,6 +270,7 @@ func writeEntityToResourceData(e *client.Entity, d *schema.ResourceData) diag.Di
 	writeAttributeToResource(&diags, d, "direction", e.Direction.String())
 	writeAttributeToResource(&diags, d, "force", e.Force)
 	writeAttributeToResource(&diags, d, "contents", flattenContents(e.Contents))
+	writeAttributeToResource(&diags, d, "recipe", flattenRecipe(e.Recipe))
 	return diags
 }
 
@@ -273,6 +324,16 @@ func resourceEntityUpdate(ctx context.Context, d *schema.ResourceData, m interfa
 			}
 		}
 		opts.Contents = &contents
+	}
+	if d.HasChange("recipe") {
+		var recipe *client.Recipe
+		if recipeList, ok := d.Get("recipe").([]interface{}); ok && len(recipeList) > 0 {
+			recipeMap := recipeList[0].(map[string]interface{})
+			recipe = &client.Recipe{
+				Kind: recipeMap["kind"].(string),
+			}
+		}
+		opts.Recipe = recipe
 	}
 	_, err = c.EntityUpdate(unitNumber, &opts)
 	if err != nil {

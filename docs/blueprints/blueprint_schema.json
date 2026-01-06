@@ -1,0 +1,118 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.com/blueprint.schema.json",
+  "title": "Blueprint Schema",
+  "description": "Schema for validating blueprint JSON structures",
+  "type": "object",
+  "required": ["blueprint"],
+  "properties": {
+    "blueprint": {
+      "type": "object",
+      "required": ["entities", "item", "version"],
+      "properties": {
+        "icons": {
+          "type": "array",
+          "description": "Visual markers for blueprint identification",
+          "items": {
+            "type": "object",
+            "properties": {
+              "signal": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Signal name for the icon"
+                  }
+                },
+                "required": ["name"]
+              },
+              "index": {
+                "type": "integer",
+                "description": "Icon index"
+              }
+            },
+            "required": ["signal", "index"]
+          }
+        },
+        "entities": {
+          "type": "array",
+          "description": "Array of entities in the blueprint",
+          "items": {
+            "type": "object",
+            "required": ["entity_number", "name", "position"],
+            "properties": {
+              "entity_number": {
+                "type": "integer",
+                "description": "Unique identifier for the entity",
+                "minimum": 1
+              },
+              "name": {
+                "type": "string",
+                "description": "Type/name of the entity (e.g., 'steam-engine', 'boiler', 'pipe')"
+              },
+              "position": {
+                "type": "object",
+                "required": ["x", "y"],
+                "properties": {
+                  "x": {
+                    "type": "number",
+                    "description": "X coordinate position"
+                  },
+                  "y": {
+                    "type": "number",
+                    "description": "Y coordinate position"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "direction": {
+                "type": "integer",
+                "description": "Optional direction/orientation of the entity",
+                "enum": [0, 1, 2, 3, 4, 5, 6, 7],
+                "default": 0,
+                "metadata": {
+                  "direction_mapping": {
+                    "0": "North (Default)",
+                    "1": "Northeast (Diagonal)",
+                    "2": "East",
+                    "3": "Southeast (Diagonal)",
+                    "4": "South",
+                    "5": "Southwest (Diagonal)",
+                    "6": "West",
+                    "7": "Northwest (Diagonal)"
+                  }
+                }
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "wires": {
+          "type": "array",
+          "description": "Array of wire connections between entities",
+          "items": {
+            "type": "array",
+            "minItems": 4,
+            "maxItems": 4,
+            "items": {
+              "type": "integer",
+              "description": "Wire connection: [entity_number_1, circuit_id_1, entity_number_2, circuit_id_2]"
+            }
+          }
+        },
+        "item": {
+          "type": "string",
+          "description": "Item type identifier",
+          "enum": ["blueprint"],
+          "default": "blueprint"
+        },
+        "version": {
+          "type": "integer",
+          "description": "Blueprint version number"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

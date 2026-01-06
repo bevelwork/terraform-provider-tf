@@ -98,8 +98,53 @@ local function get_entity_contents(e)
   return contents
 end
 
+local function get_entity_recipe(e)
+  -- Check if entity supports recipes (assembly machines, furnaces, etc.)
+  -- First check if set_recipe method exists, which indicates recipe support
+  if e.set_recipe == nil then
+    return nil
+  end
+  
+  -- Safely try to access the recipe property
+  local success, recipe = pcall(function() return e.recipe end)
+  if success and recipe ~= nil then
+    return {
+      kind = recipe.name
+    }
+  end
+  return nil
+end
+
+local function set_entity_recipe(e, recipe)
+  -- Check if entity supports recipes (assembly machines, furnaces, etc.)
+  if e.set_recipe ~= nil and recipe ~= nil and recipe.kind ~= nil then
+    -- Verify the recipe exists
+    local recipe_prototype = game.recipe_prototypes[recipe.kind]
+    if recipe_prototype == nil then
+      error(string.format('Recipe "%s" does not exist', recipe.kind))
+    end
+    -- Set the recipe
+    local success = e.set_recipe(recipe.kind)
+    if not success then
+      error(string.format('Failed to set recipe "%s" on entity "%s"', recipe.kind, e.name))
+    end
+    return
+  end
+  
+  -- If recipe is nil, clear the recipe if the entity supports it
+  if e.set_recipe ~= nil and recipe == nil then
+    e.set_recipe(nil)
+    return
+  end
+  
+  -- If no recipe support and recipe was provided, warn but don't error
+  if recipe ~= nil and recipe.kind ~= nil then
+    game.print(string.format('Warning: Entity "%s" does not support recipes', e.name))
+  end
+end
+
 local function entity_to_resource(e)
-  return {
+  local resource = {
     unit_number = e.unit_number,
     surface = e.surface.name,
     name = e.name,
@@ -108,6 +153,11 @@ local function entity_to_resource(e)
     force = e.force.name,
     contents = get_entity_contents(e)
   }
+  local recipe = get_entity_recipe(e)
+  if recipe ~= nil then
+    resource.recipe = recipe
+  end
+  return resource
 end
 
 local function position_matches(pos1, pos2, tolerance)
@@ -298,6 +348,10 @@ return {
       if config.contents ~= nil then
         set_entity_contents(matching_entity, config.contents)
       end
+      -- Update recipe if provided
+      if config.recipe ~= nil then
+        set_entity_recipe(matching_entity, config.recipe)
+      end
       return entity_to_resource(matching_entity)
     end
     
@@ -363,6 +417,11 @@ return {
       set_entity_contents(e, config.contents)
     end
     
+    -- Set recipe if provided
+    if config.recipe ~= nil then
+      set_entity_recipe(e, config.recipe)
+    end
+    
     resource_db.put('entity', e.unit_number, e)
     return entity_to_resource(e)
   end,
@@ -385,6 +444,9 @@ return {
     end
     if update_config.contents ~= nil then
       set_entity_contents(entity, update_config.contents)
+    end
+    if update_config.recipe ~= nil then
+      set_entity_recipe(entity, update_config.recipe)
     end
 
     return entity_to_resource(entity)
