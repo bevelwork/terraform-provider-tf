@@ -29,7 +29,6 @@ resource "factorio_entity" "mining_drill_west" {
     y = each.value.y
   }
   direction = "east"
-  force     = var.force
 
   # Pre-fill with coal for fuel
   contents {
@@ -48,7 +47,6 @@ resource "factorio_entity" "mining_drill_east" {
     y = each.value.y
   }
   direction = "west"
-  force     = var.force
 
   # Pre-fill with coal for fuel
   contents {
@@ -59,40 +57,37 @@ resource "factorio_entity" "mining_drill_east" {
 
 # Advanced belts running between the two columns of mining drills
 resource "factorio_entity" "belt_for_drills" {
-  count = var.height + local.belt_length
+  count = var.height + local.belt_length + 2
   name  = "express-transport-belt"
   position {
     x = var.x + 1
-    y = var.y + count.index - 1 + 0.5 - local.belt_length
+    y = var.y + count.index - 1 + 0.5 - local.belt_length - 2
   }
   direction = var.direction
-  force     = var.force
 }
 
 # Inserter to move coal from belt to chest
-resource "factorio_entity" "output_inserter" {
-  name = "burner-inserter" # Coal-powered inserter
-  position {
-    x = var.x + 1
-    y = var.y + 0.5 - local.belt_length - 2
-  }
-  direction = "south"
-  force     = var.force
-
-  # Pre-fill inserter with coal for fuel
-  contents {
-    kind = "coal"
-    qty  = 20
-  }
-}
-
-resource "factorio_entity" "output_chest" {
-  name = "steel-chest"
-  position {
-    x = var.x + 1
-    y = var.y + 0.5 - local.belt_length - 3
-  }
-  direction = "south"
-  force     = var.force
-}
+# resource "factorio_entity" "output_inserter" {
+#   name = "burner-inserter" # Coal-powered inserter
+#   position {
+#     x = var.x + 1
+#     y = var.y + 0.5 - local.belt_length - 2
+#   }
+#   direction = "south"
+# 
+#   # Pre-fill inserter with coal for fuel
+#   contents {
+#     kind = "coal"
+#     qty  = 20
+#   }
+# }
+# 
+# resource "factorio_entity" "output_chest" {
+#   name = "steel-chest"
+#   position {
+#     x = var.x + 1
+#     y = var.y + 0.5 - local.belt_length - 3
+#   }
+#   direction = "south"
+# }
 

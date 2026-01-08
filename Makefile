@@ -1,4 +1,5 @@
 .PHONY: help build build-clean setup sync sync-server sync-all pull run run-detached clean clean-tf clean-all terraform-init terraform-plan terraform-apply terraform-destroy tf stop disable-dlc
+parallelism := 1
 
 # Default target
 .DEFAULT_GOAL := build
@@ -211,13 +212,13 @@ terraform-get: ## Get/update Terraform modules (works with dev overrides, no pro
 	@echo "Note: With dev overrides, 'terraform validate' may fail, but 'terraform plan' and 'terraform apply' will work."
 
 terraform-plan: terraform-get ## Run Terraform plan (works with dev overrides)
-	@cd $(EXAMPLE_DIR) terraform plan -parllelism=500
+	@cd $(EXAMPLE_DIR) terraform plan -parllelism=$(parallelism)
 
 terraform-apply: terraform-get ## Apply Terraform configuration (works with dev overrides)
-	@cd $(EXAMPLE_DIR) && terraform apply -auto-approve -parallelism=500
+	@cd $(EXAMPLE_DIR) && terraform apply -auto-approve -parallelism=$(parallelism)
 
 terraform-destroy: ## Destroy Terraform resources
-	@cd $(EXAMPLE_DIR) && terraform destroy -parallelism=500 -auto-approve
+	@cd $(EXAMPLE_DIR) && terraform destroy -parallelism=$(parallelism) -auto-approve
 
 tf: terraform-plan terraform-apply ## Run full Terraform workflow (plan, apply)
 	@echo "Terraform workflow complete!"
