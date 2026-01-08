@@ -49,11 +49,63 @@ resource "factorio_entity" "defense_turrets" {
 #   height = 30
 # }
 
-module "iron_furnace" {
-  source = "./modules/furnace_stack"
-  x      = -38.5
-  y      = 31.5
-}
+# resource "factorio_entity" "assembler_3x3" {
+#   for_each = { for i, val in [
+#     { x = -41.5, y = 30.5 },
+#     { x = -38.5, y = 30.5 },
+#     { x = -35.5, y = 30.5 },
+# 
+#     { x = -41.5, y = 33.5 },
+#     { x = -38.5, y = 33.5 },
+#     { x = -35.5, y = 33.5 },
+# 
+#     { x = -41.5, y = 36.5 },
+#     { x = -38.5, y = 36.5 },
+#     { x = -35.5, y = 36.5 },
+#   ] : i => val }
+#   name = "assembling-machine-3"
+#   position {
+#     x = each.value.x
+#     y = each.value.y
+#   }
+#   contents {
+#     kind = "coal"
+#     qty  = 20
+#   }
+# }
+# resource "factorio_entity" "stone_furnace3x3" {
+#   for_each = { for i, val in [
+#     { x = -41.5, y = 30.5 },
+#     { x = -39.5, y = 30.5 },
+#     { x = -37.5, y = 30.5 },
+# 
+#     { x = -41.5, y = 32.5 },
+#     { x = -39.5, y = 32.5 },
+#     { x = -37.5, y = 32.5 },
+# 
+#     { x = -41.5, y = 34.5 },
+#     { x = -39.5, y = 34.5 },
+#     { x = -37.5, y = 34.5 },
+#   ] : i => val }
+#   name = "stone-furnace"
+#   position {
+#     x = each.value.x
+#     y = each.value.y
+#   }
+#   contents {
+#     kind = "coal"
+#     qty  = 20
+#   }
+# }
+
+
+
+
+# module "iron_furnace" {
+#   source = "./modules/furnace_stack"
+#   x      = -38.5
+#   y      = 31.5
+# }
 
 # module "copper_extractor_farm" {
 #   source = "./modules/coal_extractor_farm"
@@ -97,11 +149,11 @@ module "iron_furnace" {
 #   height = 13
 # }
 
-module "joiner" {
-  source = "./modules/joiner"
-  x      = -41
-  y      = 34
-}
+# module "joiner" {
+#   source = "./modules/joiner"
+#   x      = -41
+#   y      = 34
+# }
 
 ## JOINER
 # resource "factorio_entity" "feed_joiner" {
@@ -124,18 +176,6 @@ module "joiner" {
 #     y = each.value.y
 #   }
 # }
-
-resource "factorio_entity" "left_furnace" {
-  name = "stone-furnace"
-  position {
-    x = -41
-    y = 30
-  }
-  contents {
-    kind = "coal"
-    qty  = 20
-  }
-}
 
 
 # module "full_chest" {

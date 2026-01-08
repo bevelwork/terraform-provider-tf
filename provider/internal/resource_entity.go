@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"math"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -105,6 +106,91 @@ func resourceEntity() *schema.Resource {
 	}
 }
 
+// tileToCenterPosition converts tile coordinates to center-based coordinates.
+// In Factorio, entities are positioned by their center. If the user provides
+// integer tile coordinates (e.g., x=10, y=20), we convert them to center
+// coordinates (x=10.5, y=20.5) for a 1x1 entity. If the coordinates are
+// already non-integer, we assume they're already center coordinates.
+func tileToCenterPosition(pos client.Position) client.Position {
+	const epsilon = 0.001 // Small epsilon for floating point comparison
+	
+	// Check if x is an integer (or very close to one)
+	xIsInteger := math.Abs(float64(pos.X)-math.Round(float64(pos.X))) < epsilon
+	yIsInteger := math.Abs(float64(pos.Y)-math.Round(float64(pos.Y))) < epsilon
+	
+	centerPos := pos
+	if xIsInteger {
+		centerPos.X = pos.X + 0.5
+	}
+	if yIsInteger {
+		centerPos.Y = pos.Y + 0.5
+	}
+	
+	return centerPos
+}
+
+// normalizePosition normalizes positions between Factorio's actual position and
+// Terraform state to prevent drift. Factorio may snap positions (e.g., .5 to integer),
+// so we need to handle both cases:
+// 1. If Factorio returns integer and state has .5: use Factorio's integer (it was snapped)
+// 2. If Factorio returns .5 and state has integer: use state's integer (user's original intent)
+// 3. Otherwise: use Factorio's position (source of truth)
+func normalizePosition(factorioPos client.Position, statePos *client.Position) client.Position {
+	const epsilon = 0.001 // Small epsilon for floating point comparison
+	const centerOffset = 0.5
+	
+	result := factorioPos
+	
+	// Check if Factorio position is a center position (ends in .5) or integer
+	xFactorioDiff := math.Abs(float64(factorioPos.X) - math.Round(float64(factorioPos.X)))
+	xFactorioIsCenter := math.Abs(xFactorioDiff - centerOffset) < epsilon
+	xFactorioIsInteger := xFactorioDiff < epsilon
+	
+	yFactorioDiff := math.Abs(float64(factorioPos.Y) - math.Round(float64(factorioPos.Y)))
+	yFactorioIsCenter := math.Abs(yFactorioDiff - centerOffset) < epsilon
+	yFactorioIsInteger := yFactorioDiff < epsilon
+	
+	// If we have state position, check for mismatches
+	if statePos != nil {
+		xStateDiff := math.Abs(float64(statePos.X) - math.Round(float64(statePos.X)))
+		xStateIsInteger := xStateDiff < epsilon
+		xStateIsCenter := math.Abs(xStateDiff - centerOffset) < epsilon
+		
+		yStateDiff := math.Abs(float64(statePos.Y) - math.Round(float64(statePos.Y)))
+		yStateIsInteger := yStateDiff < epsilon
+		yStateIsCenter := math.Abs(yStateDiff - centerOffset) < epsilon
+		
+		// Case 1: Factorio returned integer, state has .5 - Factorio snapped it, use Factorio's integer
+		// This prevents drift when Factorio snaps .5 positions to integers
+		if xFactorioIsInteger && xStateIsCenter {
+			result.X = factorioPos.X
+		} else if xFactorioIsCenter && xStateIsInteger {
+			// Case 2: Factorio returned .5, state has integer - user provided integer, use state's integer
+			// This preserves user's original integer coordinates
+			result.X = statePos.X
+		}
+		// Otherwise: use Factorio's position as-is (source of truth)
+		
+		if yFactorioIsInteger && yStateIsCenter {
+			result.Y = factorioPos.Y
+		} else if yFactorioIsCenter && yStateIsInteger {
+			result.Y = statePos.Y
+		}
+	} else {
+		// No state position - if Factorio returned center position, convert to integer
+		// This handles the first read after creation where user might have provided integers
+		// that were converted to .5, but Factorio snapped them back
+		if xFactorioIsCenter {
+			result.X = float32(math.Trunc(float64(factorioPos.X)))
+		}
+		if yFactorioIsCenter {
+			result.Y = float32(math.Trunc(float64(factorioPos.Y)))
+		}
+	}
+	
+	return result
+}
+
 func resourceEntityCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	c := m.(*client.FactorioClient)
 	var opts client.EntityCreateOptions
@@ -116,10 +202,12 @@ func resourceEntityCreate(ctx context.Context, d *schema.ResourceData, m interfa
 
 	surface := d.Get("surface").(string)
 	name := d.Get("name").(string)
-	position := client.Position{
+	// Convert tile coordinates to center coordinates if needed
+	rawPosition := client.Position{
 		X: float32(d.Get("position.0.x").(float64)),
 		Y: float32(d.Get("position.0.y").(float64)),
 	}
+	position := tileToCenterPosition(rawPosition)
 	force := d.Get("force").(string)
 	
 	// Extract contents
@@ -240,10 +328,24 @@ func writeAttributeToResource(diagOut *diag.Diagnostics, d *schema.ResourceData,
 	}
 }
 
-func flattenPosition(pos client.Position) []map[string]float64 {
+func flattenPosition(pos client.Position, d *schema.ResourceData) []map[string]float64 {
+	// Get current state position if it exists
+	var statePos *client.Position
+	if positionList, ok := d.Get("position").([]interface{}); ok && len(positionList) > 0 {
+		if positionMap, ok := positionList[0].(map[string]interface{}); ok {
+			statePos = &client.Position{
+				X: float32(positionMap["x"].(float64)),
+				Y: float32(positionMap["y"].(float64)),
+			}
+		}
+	}
+	
+	// Normalize position to prevent drift between Factorio's actual position and state
+	normalizedPos := normalizePosition(pos, statePos)
+	
 	flat := make(map[string]float64)
-	flat["x"] = float64(pos.X)
-	flat["y"] = float64(pos.Y)
+	flat["x"] = float64(normalizedPos.X)
+	flat["y"] = float64(normalizedPos.Y)
 	return []map[string]float64{flat}
 }
 
@@ -277,7 +379,7 @@ func writeEntityToResourceData(e *client.Entity, d *schema.ResourceData) diag.Di
 	writeAttributeToResource(&diags, d, "unit_number", e.UnitNumber)
 	writeAttributeToResource(&diags, d, "surface", e.Surface)
 	writeAttributeToResource(&diags, d, "name", e.Name)
-	writeAttributeToResource(&diags, d, "position", flattenPosition(e.Position))
+	writeAttributeToResource(&diags, d, "position", flattenPosition(e.Position, d))
 	writeAttributeToResource(&diags, d, "direction", e.Direction.String())
 	writeAttributeToResource(&diags, d, "force", e.Force)
 	writeAttributeToResource(&diags, d, "contents", flattenContents(e.Contents))

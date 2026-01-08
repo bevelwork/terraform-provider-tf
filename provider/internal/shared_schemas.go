@@ -9,9 +9,38 @@ import (
 )
 
 func shouldSuppressDiffPosition(k, old, new string, d *schema.ResourceData) bool {
-	oldF, _ := strconv.ParseFloat(old, 64)
-	newF, _ := strconv.ParseFloat(new, 64)
-	return int64(math.Floor(oldF)) == int64(math.Floor(newF))
+	oldF, errOld := strconv.ParseFloat(old, 64)
+	newF, errNew := strconv.ParseFloat(new, 64)
+	
+	// If parsing failed, don't suppress (let Terraform handle it)
+	if errOld != nil || errNew != nil {
+		return false
+	}
+	
+	// If values are the same, suppress diff
+	if oldF == newF {
+		return true
+	}
+	
+	// Check if the absolute difference is small (within 0.6 to account for .5 positions)
+	// This handles cases where Factorio snaps .5 positions to integers or vice versa
+	diff := math.Abs(oldF - newF)
+	if diff < 0.6 {
+		// Values are within the same tile, suppress diff
+		return true
+	}
+	
+	// Also check if both values round to the same integer
+	// This handles cases like -37.5 vs -37 (Factorio snaps .5 to integer)
+	// Use a small epsilon to handle floating point precision issues
+	const epsilon = 0.001
+	oldRounded := math.Round(oldF)
+	newRounded := math.Round(newF)
+	if math.Abs(oldRounded - newRounded) < epsilon {
+		return true
+	}
+	
+	return false
 }
 
 func integerPositionSchema(base *schema.Schema) *schema.Schema {
