@@ -11,17 +11,13 @@ variable "direction" {
 locals {
   # Generate positions for mining drills (vertical column)
   belt_length = 10
-  drill_positions = [
-    for i in range(var.height / 2) : {
-      x = var.x
-      y = var.y + i * 2
-    }
-  ]
 }
 
 # Burner mining drills in a vertical column
-resource "factorio_entity" "mining_drill_west" {
-  for_each = { for idx, pos in local.drill_positions : idx => pos }
+resource "factorio_entity" "mining_drill_left" {
+  for_each = { for idx in range(0, var.height) : idx =>
+    { x = var.x - 1, y = var.y + idx * 2 }
+  }
 
   name = "burner-mining-drill"
   position {
@@ -36,14 +32,14 @@ resource "factorio_entity" "mining_drill_west" {
     qty  = 50
   }
 }
-
-# Burner mining drills in a vertical column
-resource "factorio_entity" "mining_drill_east" {
-  for_each = { for idx, pos in local.drill_positions : idx => pos }
+resource "factorio_entity" "mining_drill_right" {
+  for_each = { for idx in range(0, var.height) : idx =>
+    { x = var.x + 2, y = var.y + idx * 2 }
+  }
 
   name = "burner-mining-drill"
   position {
-    x = each.value.x + 3
+    x = each.value.x
     y = each.value.y
   }
   direction = "west"
@@ -51,9 +47,27 @@ resource "factorio_entity" "mining_drill_east" {
   # Pre-fill with coal for fuel
   contents {
     kind = "coal"
-    qty  = 50
+    qty  = 20
   }
 }
+
+# Burner mining drills in a vertical column
+# resource "factorio_entity" "mining_drill_east" {
+#   for_each = { for idx, pos in local.drill_positions : idx => pos }
+# 
+#   name = "burner-mining-drill"
+#   position {
+#     x = each.value.x + 3
+#     y = each.value.y
+#   }
+#   direction = "west"
+# 
+#   # Pre-fill with coal for fuel
+#   contents {
+#     kind = "coal"
+#     qty  = 50
+#   }
+# }
 
 # Advanced belts running between the two columns of mining drills
 resource "factorio_entity" "belt_for_drills" {
@@ -61,7 +75,7 @@ resource "factorio_entity" "belt_for_drills" {
   name  = "express-transport-belt"
   position {
     x = var.x + 1
-    y = var.y + count.index - 1 + 0.5 - local.belt_length - 2
+    y = var.y + count.index - 1 - local.belt_length - 2
   }
   direction = var.direction
 }

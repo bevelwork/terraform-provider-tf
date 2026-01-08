@@ -295,6 +295,58 @@ return {
     }
     local existing_entities = surface.find_entities_filtered({area = area})
     
+    -- Helper function to check if a position is water or cliff (don't place entities on these)
+    local function is_water_or_cliff(pos)
+      local tile = surface.get_tile(math.floor(pos.x), math.floor(pos.y))
+      if tile == nil then
+        return false
+      end
+      local tile_name = tile.name
+      -- Check for water tiles
+      if string.find(tile_name, "water") ~= nil then
+        return true
+      end
+      -- Check for cliff tiles
+      if string.find(tile_name, "cliff") ~= nil then
+        return true
+      end
+      -- Check for deep water
+      if tile_name == "deepwater" or tile_name == "deepwater-green" then
+        return true
+      end
+      return false
+    end
+    
+    -- Check if the target position is water or cliff - don't allow entity creation on these
+    if is_water_or_cliff(position) then
+      error(string.format('Cannot place entity "%s" at (%.1f, %.1f): position is water or cliff', config.name, position.x, position.y))
+    end
+    
+    -- Helper function to check if an entity is a resource (ore, coal, etc.) - don't clobber these
+    local function is_resource_entity(entity)
+      if entity == nil or not entity.valid then
+        return false
+      end
+      
+      -- Check entity type first (safest way)
+      local success, entity_type = pcall(function() return entity.type end)
+      if success and entity_type == "resource" then
+        return true
+      end
+      
+      -- Check by name for common resources
+      local name = entity.name
+      if name == "iron-ore" or name == "copper-ore" or name == "coal" or name == "stone" or name == "uranium-ore" or name == "crude-oil" then
+        return true
+      end
+      -- Check for resource patches (they often have names like "iron-ore", "copper-ore", etc.)
+      if string.find(name, "-ore") ~= nil then
+        return true
+      end
+      
+      return false
+    end
+    
     -- Helper function to check if an entity should be auto-cleared (crash-site entities, trees, rocks, etc.)
     local function should_auto_clear_entity(entity)
       local name = entity.name
@@ -386,36 +438,60 @@ return {
       end
     end
     
-    -- If there are conflicting entities (different type), handle based on force_replace
+    -- If there are conflicting entities (different type), handle clobber behavior
     if #conflicting_entities > 0 then
       local force_replace = config.force_replace == true
       local managed_conflicts = {}
       local unmanaged_conflicts = {}
+      local clobberable_conflicts = {}
       
-      -- Separate conflicts into managed (in resource_db) and unmanaged
+      -- Check if position is water or cliff - don't clobber these
+      local position_is_water_or_cliff = is_water_or_cliff(position)
+      
+      -- Separate conflicts into managed (in resource_db), unmanaged, and clobberable
       for _, conflicting_entity in pairs(conflicting_entities) do
         local unit_number = conflicting_entity.unit_number
         local managed_entity = resource_db.get('entity', unit_number)
-        if managed_entity ~= nil then
-          -- This entity is managed by Terraform, don't destroy it
-          table.insert(managed_conflicts, conflicting_entity)
-        else
-          -- This entity is not managed by Terraform
+        
+        -- Never clobber resource entities (ores, coal, etc.)
+        if is_resource_entity(conflicting_entity) then
           table.insert(unmanaged_conflicts, conflicting_entity)
-        end
-      end
-      
-      -- If force_replace is true, destroy unmanaged conflicting entities
-      if force_replace and #unmanaged_conflicts > 0 then
-        for _, unmanaged_entity in pairs(unmanaged_conflicts) do
-          if unmanaged_entity.valid then
-            unmanaged_entity.destroy()
+        elseif managed_entity ~= nil then
+          -- This entity is managed by Terraform
+          if force_replace then
+            -- If force_replace is true, allow clobbering even managed entities
+            table.insert(clobberable_conflicts, conflicting_entity)
+          else
+            -- Don't destroy Terraform-managed entities unless force_replace is true
+            table.insert(managed_conflicts, conflicting_entity)
+          end
+        else
+          -- This entity is not managed by Terraform - can be clobbered unless on water/cliff
+          if position_is_water_or_cliff then
+            -- Don't clobber on water/cliff
+            table.insert(unmanaged_conflicts, conflicting_entity)
+          else
+            -- Safe to clobber
+            table.insert(clobberable_conflicts, conflicting_entity)
           end
         end
       end
       
-      -- If there are still managed conflicts, or unmanaged conflicts without force_replace, error
-      if #managed_conflicts > 0 or (#unmanaged_conflicts > 0 and not force_replace) then
+      -- Clobber unmanaged entities (unless on water/cliff)
+      for _, clobber_entity in pairs(clobberable_conflicts) do
+        if clobber_entity.valid then
+          -- Remove from resource_db if it's tracked
+          local unit_number = clobber_entity.unit_number
+          if resource_db.get('entity', unit_number) ~= nil then
+            resource_db.put('entity', unit_number, nil)
+          end
+          -- Destroy the entity
+          clobber_entity.destroy()
+        end
+      end
+      
+      -- If there are still managed conflicts (without force_replace), or unmanaged conflicts on water/cliff, error
+      if #managed_conflicts > 0 or #unmanaged_conflicts > 0 then
         local conflict_msg_parts = {}
         for _, conflicting_entity in pairs(managed_conflicts) do
           local entity_name = conflicting_entity.name
@@ -429,7 +505,13 @@ return {
           local pos = conflicting_entity.position
           entity_name = string.gsub(entity_name, '\n', ' ')
           entity_name = string.gsub(entity_name, '\r', ' ')
-          table.insert(conflict_msg_parts, string.format('please remove %s from (%.1f, %.1f)', entity_name, pos.x, pos.y))
+          local reason = ""
+          if position_is_water_or_cliff then
+            reason = " (position is water or cliff)"
+          elseif is_resource_entity(conflicting_entity) then
+            reason = " (resource entities cannot be automatically removed)"
+          end
+          table.insert(conflict_msg_parts, string.format('please remove %s from (%.1f, %.1f)%s', entity_name, pos.x, pos.y, reason))
         end
         local conflict_msg = table.concat(conflict_msg_parts, ', ')
         conflict_msg = string.gsub(conflict_msg, '\n', ' ')

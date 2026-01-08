@@ -31,23 +31,17 @@ resource "factorio_entity" "defense_turrets" {
   }
 }
 
-# module "iron_extractor_farm" {
-#   for_each = { for idx, vals in [
-#     { x = -42, y = 48 },
-#     { x = -37, y = 48 },
-#     { x = -33, y = 48 },
-#     { x = -29, y = 48 },
-#     { x = -25, y = 48 },
-#     { x = -21, y = 48 },
-#     { x = -17, y = 48 },
-#     { x = -13, y = 48 },
-#     { x = -9, y = 48 },
-#   ] : idx => vals }
-#   source = "./modules/coal_extractor_farm"
-#   x      = each.value.x
-#   y      = each.value.y
-#   height = 30
-# }
+module "iron_extractor_farm" {
+  source = "./modules/coal_extractor_farm"
+  for_each = { for idx, vals in [
+    { x = -42, y = 48 },
+    { x = -37, y = 48 },
+    { x = -32, y = 48 },
+  ] : idx => vals }
+  x      = each.value.x
+  y      = each.value.y
+  height = 30
+}
 
 # resource "factorio_entity" "assembler_3x3" {
 #   for_each = { for i, val in [

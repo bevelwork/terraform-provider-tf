@@ -1,8 +1,13 @@
 .PHONY: help build build-clean setup sync sync-server sync-all pull run run-detached clean clean-tf clean-all terraform-init terraform-plan terraform-apply terraform-destroy tf stop disable-dlc
-parallelism := 1
+parallelism := 100
 
 # Default target
-.DEFAULT_GOAL := build
+.DEFAULT_GOAL := default
+
+default: build
+default: sync-all
+default: stop
+default: run
 
 # Detect OS and set Factorio mods directory
 UNAME_S := $(shell uname -s)
