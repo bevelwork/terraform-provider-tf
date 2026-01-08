@@ -98,6 +98,7 @@ type EntityCreateOptions struct {
 	EntitySpecificParameters map[string]interface{} `json:"entity_specific_parameters"`
 	Contents                 []Content              `json:"contents,omitempty"`
 	Recipe                   *Recipe                `json:"recipe,omitempty"`
+	ForceReplace             *bool                  `json:"force_replace,omitempty"` // If true, remove non-managed conflicting entities
 
 	// Unimplemented
 	/*

@@ -1,0 +1,225 @@
+# Example of using the full_chest module with for_each
+module "full_chests" {
+  source = "./modules/full_chest"
+  for_each = {
+    "iron-plates" = {
+      kind = "iron-plate"
+      x    = 30
+      y    = 0
+    }
+    "copper-plates" = {
+      kind = "copper-plate"
+      x    = 32
+      y    = 0
+    }
+    "steel-plates" = {
+      kind = "steel-plate"
+      x    = 34
+      y    = 0
+    }
+    "coal" = {
+      kind = "coal"
+      x    = 36
+      y    = 0
+    }
+  }
+  kind = each.value.kind
+  x    = each.value.x
+  y    = each.value.y
+}
+
+# Example of assembly machine with recipe positioned above each player
+# resource "factorio_entity" "assembly_machine" {
+#   for_each = {
+#     for player_index, player in data.factorio_players.all.players :
+#     player_index => {
+#       x = player.position[0].x
+#       y = player.position[0].y - 2 # 2 tiles above the player
+#     }
+#   }
+# 
+#   surface = "nauvis"
+#   name    = "assembling-machine-1"
+#   position {
+#     x = each.value.x
+#     y = each.value.y
+#   }
+#   direction = "north"
+#   force     = "player"
+# 
+#   recipe {
+#     kind = "iron-gear-wheel"
+#   }
+# }
+
+# Example of resource creating
+# resource "factorio_entity" "a-furnace" {
+#   surface = "nauvis"
+#   name    = "stone-furnace"
+#   position {
+#     x = 1
+#     y = 2
+#   }
+#   direction = "north"
+#   force     = "player"
+# }
+# 
+# # Creating a ghost, requires entity_specific_parameters
+# resource "factorio_entity" "a-ghost-furnace" {
+#   surface = "nauvis"
+#   name    = "entity-ghost"
+#   position {
+#     x = 3
+#     y = 2
+#   }
+#   direction = "north"
+#   force     = "player"
+#   entity_specific_parameters = {
+#     inner_name = "stone-furnace"
+#     expires    = false
+#   }
+# }
+# 
+# # Example of creating an entity with contents (burner mining drill with wood fuel)
+# resource "factorio_entity" "burner_mining_drill" {
+#   surface = "nauvis"
+#   name    = "burner-mining-drill"
+#   position {
+#     x = 5
+#     y = 2
+#   }
+#   direction = "north"
+#   force     = "player"
+# 
+#   contents {
+#     kind = "wood"
+#     qty  = 50
+#   }
+# }
+# 
+# # Example of a steel chest with various raw resources and items
+# resource "factorio_entity" "steel_chest" {
+#   surface = "nauvis"
+#   name    = "steel-chest"
+#   position {
+#     x = 7
+#     y = 2
+#   }
+#   direction = "north"
+#   force     = "player"
+# 
+#   contents {
+#     kind = "coal"
+#     qty  = 50
+#   }
+#   contents {
+#     kind = "stone"
+#     qty  = 50
+#   }
+#   contents {
+#     kind = "iron-ore"
+#     qty  = 50
+#   }
+#   contents {
+#     kind = "copper-ore"
+#     qty  = 50
+#   }
+#   contents {
+#     kind = "uranium-ore"
+#     qty  = 50
+#   }
+#   contents {
+#     kind = "iron-gear-wheel"
+#     qty  = 200
+#   }
+#   contents {
+#     kind = "iron-plate"
+#     qty  = 100
+#   }
+#   contents {
+#     kind = "copper-plate"
+#     qty  = 100
+#   }
+# }
+# 
+# Example of using the coal extractor farm module
+locals {
+  coal_extractor_locations = [
+    { x = -12, y = -110 },
+    { x = -7, y = -110 },
+    { x = -2, y = -110 },
+    { x = 2, y = -110 },
+    { x = 7, y = -110 },
+  ]
+}
+
+module "coal_extractor_farm" {
+  for_each  = { for loc in local.coal_extractor_locations : "${loc.x}_${loc.y}" => loc }
+  source    = "./modules/coal_extractor_farm"
+  direction = "north"
+  x         = each.value.x
+  y         = each.value.y
+  height    = 25
+  width     = 10
+}
+
+# Power plant positioned 20 squares to the right of each player
+module "power_plant" {
+  source  = "./modules/power_plant_batch_1"
+  base_x  = 19.5
+  base_y  = 11.5
+  surface = "nauvis"
+  force   = "player"
+}
+
+# resource "factorio_entity" "steel_chests" {
+#   for_each = merge([
+#     for player_index, player in data.factorio_players.all.players : {
+#       for i in range(5) : "${player_index}_${i}" => {
+#         x = 10 + player.position[0].x          # 10 tiles to the east of text center (text width ~25, offset -23, so center is around 0)
+#         y = (i * 2) - 4 + player.position[0].y # Spaced 2 tiles apart vertically, centered around y=0
+#       }
+#     }
+#   ]...)
+#   surface = "nauvis"
+#   name    = "steel-chest"
+#   position {
+#     x = each.value.x
+#     y = each.value.y
+#   }
+#   direction = "north"
+#   force     = "player"
+# 
+#   contents {
+#     kind = "coal"
+#     qty  = 50
+#   }
+#   contents {
+#     kind = "stone"
+#     qty  = 50
+#   }
+#   contents {
+#     kind = "iron-ore"
+#     qty  = 50
+#   }
+#   contents {
+#     kind = "copper-ore"
+#     qty  = 50
+#   }
+#   contents {
+#     kind = "uranium-ore"
+#     qty  = 50
+#   }
+#   contents {
+#     kind = "iron-gear-wheel"
+#     qty  = 200
+#   }
+#   contents {
+#     kind = "iron-plate"
+#     qty  = 100
+#   }
+#   contents {
+#     kind = "copper-plate"
+#     qty  = 100
+#   }
+# }

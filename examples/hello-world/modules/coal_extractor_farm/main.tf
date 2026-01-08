@@ -1,27 +1,3 @@
-module "coal_chest" {
-  source = "../full_chest"
-
-  kind = "coal"
-  x    = 10
-  y    = 10
-}
-
-resource "factorio_entity" "output_chest" {
-  surface = var.surface
-  name    = "steel-chest"
-  position {
-    x = local.chest_location.x
-    y = local.chest_location.y
-  }
-  direction = "north"
-  force     = var.force
-  lifecycle {
-    ignore_changes = [
-      contents,
-    ]
-  }
-}
-
 variable "direction" {
   type        = string
   description = "North or South belt output direction"
@@ -35,14 +11,10 @@ variable "direction" {
 locals {
   # Generate positions for mining drills (vertical column)
   belt_length = 10
-  chest_location = {
-    x = var.x + 1
-    y = var.y - local.belt_length - 2
-  }
   drill_positions = [
-    for i in range(var.height) : {
+    for i in range(var.height / 2) : {
       x = var.x
-      y = var.y + i
+      y = var.y + i * 2
     }
   ]
 }
@@ -51,8 +23,7 @@ locals {
 resource "factorio_entity" "mining_drill_west" {
   for_each = { for idx, pos in local.drill_positions : idx => pos }
 
-  surface = var.surface
-  name    = "burner-mining-drill"
+  name = "burner-mining-drill"
   position {
     x = each.value.x
     y = each.value.y
@@ -71,8 +42,7 @@ resource "factorio_entity" "mining_drill_west" {
 resource "factorio_entity" "mining_drill_east" {
   for_each = { for idx, pos in local.drill_positions : idx => pos }
 
-  surface = var.surface
-  name    = "burner-mining-drill"
+  name = "burner-mining-drill"
   position {
     x = each.value.x + 3
     y = each.value.y
@@ -88,13 +58,12 @@ resource "factorio_entity" "mining_drill_east" {
 }
 
 # Advanced belts running between the two columns of mining drills
-resource "factorio_entity" "belt" {
-  for_each = { for i in range(local.belt_length + var.height) : i => i }
-  surface  = var.surface
-  name     = "express-transport-belt"
+resource "factorio_entity" "belt_for_drills" {
+  count = var.height + local.belt_length
+  name  = "express-transport-belt"
   position {
     x = var.x + 1
-    y = var.y + each.value - local.belt_length
+    y = var.y + count.index - 1 + 0.5 - local.belt_length
   }
   direction = var.direction
   force     = var.force
@@ -102,11 +71,10 @@ resource "factorio_entity" "belt" {
 
 # Inserter to move coal from belt to chest
 resource "factorio_entity" "output_inserter" {
-  surface = var.surface
-  name    = "burner-inserter" # Coal-powered inserter
+  name = "burner-inserter" # Coal-powered inserter
   position {
-    x = local.chest_location.x
-    y = local.chest_location.y + 1
+    x = var.x + 1
+    y = var.y + 0.5 - local.belt_length - 2
   }
   direction = "south"
   force     = var.force
@@ -116,5 +84,15 @@ resource "factorio_entity" "output_inserter" {
     kind = "coal"
     qty  = 20
   }
+}
+
+resource "factorio_entity" "output_chest" {
+  name = "steel-chest"
+  position {
+    x = var.x + 1
+    y = var.y + 0.5 - local.belt_length - 3
+  }
+  direction = "south"
+  force     = var.force
 }
 

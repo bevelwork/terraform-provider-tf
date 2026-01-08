@@ -142,8 +142,6 @@ setup: sync ## Set up Factorio server (copy mods, create volume, configure RCON)
 	@cp -r $(MOD_DIR) $(FACTORIO_VOLUME)/mods/ || \
 	(sudo cp -r $(MOD_DIR) $(FACTORIO_VOLUME)/mods/ || \
 	(echo "Error: Could not copy mod directory. Please check permissions." && exit 1))
-	@echo "Removing existing saves (they may have DLC mods enabled)..."
-	@rm -f $(FACTORIO_VOLUME)/saves/*.zip 2>/dev/null || true
 	@echo "Creating mod-list.json to disable DLC mods..."
 	@printf '{\n  "mods": [\n    {"name": "base", "enabled": true},\n    {"name": "terraform-crud-api", "enabled": true},\n    {"name": "space-age", "enabled": false},\n    {"name": "elevated-rails", "enabled": false},\n    {"name": "quality", "enabled": false}\n  ]\n}\n' > $(FACTORIO_VOLUME)/mods/mod-list.json
 	@echo "$(RCON_PW)" > $(FACTORIO_VOLUME)/config/rconpw
@@ -219,7 +217,7 @@ terraform-apply: terraform-get ## Apply Terraform configuration (works with dev 
 	@cd $(EXAMPLE_DIR) && terraform apply -auto-approve -parallelism=500
 
 terraform-destroy: ## Destroy Terraform resources
-	@cd $(EXAMPLE_DIR) && terraform destroy -parallelism=500
+	@cd $(EXAMPLE_DIR) && terraform destroy -parallelism=500 -auto-approve
 
 tf: terraform-plan terraform-apply ## Run full Terraform workflow (plan, apply)
 	@echo "Terraform workflow complete!"

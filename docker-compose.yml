@@ -10,10 +10,12 @@ services:
       - ./examples/hello-world/scripts/factorio-volume:/factorio
     environment:
       # Disable DLC mods
+      - PRESET=rich-resources 
       - DLC_SPACE_AGE=base
       - RCON_PASSWORD=${RCON_PASSWORD:-password}
-      - LOAD_LATEST_SAVE=false
-      - GENERATE_NEW_SAVE=false
+      - LOAD_LATEST_SAVE=true
+      - GENERATE_NEW_SAVE=true
+      - SAVE_NAME=terraform-world
     # Health check to ensure server is running
     healthcheck:
       test: ["CMD-SHELL", "timeout 5 bash -c '</dev/tcp/127.0.0.1/27015' || exit 1"]

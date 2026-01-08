@@ -95,6 +95,12 @@ func resourceEntity() *schema.Resource {
 					},
 				},
 			},
+			"force_replace": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Default:     false,
+				Description: "If true, automatically remove any non-Terraform-managed entities that collide with this resource's position.",
+			},
 		},
 	}
 }
@@ -210,6 +216,11 @@ func resourceEntityCreate(ctx context.Context, d *schema.ResourceData, m interfa
 		opts.EntitySpecificParameters = d.Get("entity_specific_parameters").(map[string]interface{})
 		opts.Contents = contents
 		opts.Recipe = recipe
+		
+		// Set force_replace if specified
+		if forceReplace, ok := d.Get("force_replace").(bool); ok && forceReplace {
+			opts.ForceReplace = &forceReplace
+		}
 
 		created, err := c.EntityCreate(&opts)
 		if err != nil {

@@ -295,18 +295,36 @@ return {
     }
     local existing_entities = surface.find_entities_filtered({area = area})
     
-    -- Helper function to check if an entity should be auto-cleared (crash-site entities, trees, etc.)
+    -- Helper function to check if an entity should be auto-cleared (crash-site entities, trees, rocks, etc.)
     local function should_auto_clear_entity(entity)
       local name = entity.name
       -- Crash-site entities
       if string.sub(name, 1, 11) == "crash-site-" then
         return true
       end
-      -- Trees (tree-01, tree-02, tree-03, tree-04, dry-tree, dead-grey-trunk, etc.)
+      -- Trees (tree-01, tree-02, tree-03, tree-04, dry-tree, dead-grey-trunk, dead-tree-desert, etc.)
       if string.sub(name, 1, 5) == "tree-" then
         return true
       end
+      -- Dead trees (dead-tree-desert, dead-tree-dry, etc.)
+      if string.sub(name, 1, 10) == "dead-tree-" then
+        return true
+      end
       if name == "dry-tree" or name == "dead-grey-trunk" then
+        return true
+      end
+      -- Rocks (rock-big, rock-huge, rock-small, sand-rock-big, big-rock, etc.)
+      if string.sub(name, 1, 5) == "rock-" then
+        return true
+      end
+      if string.find(name, "-rock-") ~= nil then
+        return true
+      end
+      if name == "big-rock" or name == "rock-big" then
+        return true
+      end
+      -- Remnants/corpses (burner-mining-drill-remnants, etc.)
+      if string.find(name, "-remnants") ~= nil then
         return true
       end
       return false
@@ -368,22 +386,56 @@ return {
       end
     end
     
-    -- If there are conflicting entities (different type), return an error instead of clobbering
+    -- If there are conflicting entities (different type), handle based on force_replace
     if #conflicting_entities > 0 then
-      local conflict_msg_parts = {}
+      local force_replace = config.force_replace == true
+      local managed_conflicts = {}
+      local unmanaged_conflicts = {}
+      
+      -- Separate conflicts into managed (in resource_db) and unmanaged
       for _, conflicting_entity in pairs(conflicting_entities) do
-        local entity_name = conflicting_entity.name
-        local pos = conflicting_entity.position
-        -- Replace newlines and other problematic characters for JSON
-        entity_name = string.gsub(entity_name, '\n', ' ')
-        entity_name = string.gsub(entity_name, '\r', ' ')
-        table.insert(conflict_msg_parts, string.format('please remove %s from (%.1f, %.1f)', entity_name, pos.x, pos.y))
+        local unit_number = conflicting_entity.unit_number
+        local managed_entity = resource_db.get('entity', unit_number)
+        if managed_entity ~= nil then
+          -- This entity is managed by Terraform, don't destroy it
+          table.insert(managed_conflicts, conflicting_entity)
+        else
+          -- This entity is not managed by Terraform
+          table.insert(unmanaged_conflicts, conflicting_entity)
+        end
       end
-      local conflict_msg = table.concat(conflict_msg_parts, ', ')
-      -- Ensure error message doesn't contain newlines that break JSON
-      conflict_msg = string.gsub(conflict_msg, '\n', ' ')
-      conflict_msg = string.gsub(conflict_msg, '\r', ' ')
-      error(string.format('Object collision: %s', conflict_msg))
+      
+      -- If force_replace is true, destroy unmanaged conflicting entities
+      if force_replace and #unmanaged_conflicts > 0 then
+        for _, unmanaged_entity in pairs(unmanaged_conflicts) do
+          if unmanaged_entity.valid then
+            unmanaged_entity.destroy()
+          end
+        end
+      end
+      
+      -- If there are still managed conflicts, or unmanaged conflicts without force_replace, error
+      if #managed_conflicts > 0 or (#unmanaged_conflicts > 0 and not force_replace) then
+        local conflict_msg_parts = {}
+        for _, conflicting_entity in pairs(managed_conflicts) do
+          local entity_name = conflicting_entity.name
+          local pos = conflicting_entity.position
+          entity_name = string.gsub(entity_name, '\n', ' ')
+          entity_name = string.gsub(entity_name, '\r', ' ')
+          table.insert(conflict_msg_parts, string.format('Terraform-managed %s at (%.1f, %.1f)', entity_name, pos.x, pos.y))
+        end
+        for _, conflicting_entity in pairs(unmanaged_conflicts) do
+          local entity_name = conflicting_entity.name
+          local pos = conflicting_entity.position
+          entity_name = string.gsub(entity_name, '\n', ' ')
+          entity_name = string.gsub(entity_name, '\r', ' ')
+          table.insert(conflict_msg_parts, string.format('please remove %s from (%.1f, %.1f)', entity_name, pos.x, pos.y))
+        end
+        local conflict_msg = table.concat(conflict_msg_parts, ', ')
+        conflict_msg = string.gsub(conflict_msg, '\n', ' ')
+        conflict_msg = string.gsub(conflict_msg, '\r', ' ')
+        error(string.format('Object collision: %s', conflict_msg))
+      end
     end
     
     local entity_creation_params = {
