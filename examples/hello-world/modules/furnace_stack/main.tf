@@ -48,8 +48,8 @@ resource "factorio_entity" "furnace" {
   }
 }
 
-resource "factorio_entity" "inserters" {
-  for_each = { for i, val in [
+locals {
+  inserter_offsets = [
     { x = var.x - 1, y = var.y, direction = "east" },
     { x = var.x + 2, y = var.y, direction = "west" },
     { x = var.x - 4, y = var.y, direction = "east" },
@@ -59,7 +59,22 @@ resource "factorio_entity" "inserters" {
     { x = var.x + 2, y = var.y - 1, direction = "west" },
     { x = var.x - 4, y = var.y - 1, direction = "east" },
     { x = var.x + 5, y = var.y - 1, direction = "west" },
-  ] : i => val }
+  ]
+  computed_inserter_locations = merge([for i in range(var.qty) : { for j, offset in local.inserter_offsets : "${i}-${j}" =>
+    {
+      x         = offset.x
+      y         = offset.y - i * 2
+      direction = offset.direction
+    }
+  }]...)
+}
+output "computed_inserter_locations" {
+  value = local.computed_inserter_locations
+}
+
+
+resource "factorio_entity" "inserters" {
+  for_each  = { for i, val in local.computed_inserter_locations : i => val }
   name      = "burner-inserter"
   direction = each.value.direction
   position {
@@ -72,21 +87,30 @@ resource "factorio_entity" "inserters" {
   }
 }
 
-resource "factorio_entity" "belt" {
-  for_each = { for i, val in [
+locals {
+  belt_offsets = [
     { x = var.x, y = var.y },
     { x = var.x, y = var.y - 1 },
-
     { x = var.x + 1, y = var.y },
     { x = var.x + 1, y = var.y - 1 },
-
     { x = var.x - 5, y = var.y },
     { x = var.x - 5, y = var.y - 1 },
     { x = var.x + 6, y = var.y },
     { x = var.x + 6, y = var.y - 1 },
+  ]
+  computed_belt_locations = merge([for i in range(var.qty) : { for j, offset in local.belt_offsets : "${i}-${j}" =>
+    {
+      x = offset.x
+      y = offset.y - i * 2
+    }
+  }]...)
+}
+output "computed_belt_locations" {
+  value = local.computed_belt_locations
+}
 
-
-  ] : i => val }
+resource "factorio_entity" "belt" {
+  for_each = { for i, val in local.computed_belt_locations : i => val }
 
   name = "express-transport-belt"
   position {
