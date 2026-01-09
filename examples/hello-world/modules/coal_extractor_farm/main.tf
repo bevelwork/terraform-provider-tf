@@ -78,7 +78,7 @@ resource "factorio_entity" "mining_drill_right" {
 
 # Advanced belts running between the two columns of mining drills
 resource "factorio_entity" "belt_for_drills" {
-  count = var.height + local.belt_length + 2
+  count = var.height * 2 + local.belt_length + 2 + 1
   name  = "express-transport-belt"
   position {
     x = var.x + 1

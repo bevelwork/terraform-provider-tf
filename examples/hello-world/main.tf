@@ -34,30 +34,85 @@ data "factorio_players" "all" {}
 module "iron_extractor_farm" {
   source = "./modules/coal_extractor_farm"
   for_each = { for idx, vals in [
-    { x = -42, y = 48 },
-    { x = -37, y = 48 },
-    { x = -31, y = 48 },
-    { x = -26, y = 48 },
+    { x = 55, y = 63 },
+    { x = 60, y = 63 },
+    { x = 66, y = 63 },
+    { x = 71, y = 63 },
   ] : idx => vals }
   x      = each.value.x
   y      = each.value.y
-  height = 30
+  height = 20
+}
+
+module "iron_joiner" {
+  source = "./modules/joiner"
+  for_each = { for idx, vals in [
+    { x = 56, y = 49 },
+    { x = 67, y = 49 },
+  ] : idx => vals }
+  x = each.value.x
+  y = each.value.y
+}
+
+module "iron_furnace" {
+  source = "./modules/furnace_stack"
+  for_each = { for idx, vals in [
+    { x = 58, y = 46 },
+    { x = 69, y = 46 },
+  ] : idx => vals }
+  x   = each.value.x
+  y   = each.value.y
+  qty = 5
+}
+
+module "copper_extractor_farm" {
+  source = "./modules/coal_extractor_farm"
+  for_each = { for idx, vals in [
+    { x = 35, y = 40 },
+    { x = 40, y = 40 },
+  ] : idx => vals }
+  x      = each.value.x
+  y      = each.value.y
+  height = 20
+}
+
+module "copper_joiner" {
+  source = "./modules/joiner"
+  for_each = { for idx, vals in [
+    { x = 36, y = 26 },
+  ] : idx => vals }
+  x = each.value.x
+  y = each.value.y
+}
+
+module "copper_furnace" {
+  source = "./modules/furnace_stack"
+  for_each = { for idx, vals in [
+    { x = 38, y = 23 },
+  ] : idx => vals }
+  x   = each.value.x
+  y   = each.value.y
+  qty = 5
+}
+
+module "one_lane_assembler" {
+  source = "./modules/one_lane_assembler"
+  for_each = { for idx, vals in [
+    { x = 53, y = 36 },
+    { x = 64, y = 36 },
+    { x = 75, y = 36 },
+  ] : idx => vals }
+  x = each.value.x
+  y = each.value.y
+
+  kind = "iron-gear-wheel"
+  qty  = 10
 }
 
 
 # resource "factorio_entity" "assembler_3x3" {
 #   for_each = { for i, val in [
-#     { x = -41.5, y = 30.5 },
-#     { x = -38.5, y = 30.5 },
-#     { x = -35.5, y = 30.5 },
-# 
-#     { x = -41.5, y = 33.5 },
-#     { x = -38.5, y = 33.5 },
-#     { x = -35.5, y = 33.5 },
-# 
-#     { x = -41.5, y = 36.5 },
-#     { x = -38.5, y = 36.5 },
-#     { x = -35.5, y = 36.5 },
+#     { x = 55, y = 28 },
 #   ] : i => val }
 #   name = "assembling-machine-3"
 #   position {
@@ -93,21 +148,6 @@ module "iron_extractor_farm" {
 #     qty  = 20
 #   }
 # }
-
-module "iron_furnace" {
-  source = "./modules/furnace_stack"
-  for_each = { for idx, vals in [
-    { x = -39, y = 31 },
-    { x = -28, y = 31 },
-  ] : idx => vals }
-  x   = each.value.x
-  y   = each.value.y
-  qty = 5
-}
-
-output "furnace_stack" {
-  value = module.iron_furnace
-}
 
 # module "copper_extractor_farm" {
 #   source = "./modules/coal_extractor_farm"
@@ -151,15 +191,6 @@ output "furnace_stack" {
 #   height = 13
 # }
 
-module "joiner" {
-  source = "./modules/joiner"
-  for_each = { for idx, vals in [
-    { x = -41, y = 34 },
-    { x = -30, y = 34 },
-  ] : idx => vals }
-  x = each.value.x
-  y = each.value.y
-}
 
 ## JOINER
 # resource "factorio_entity" "feed_joiner" {

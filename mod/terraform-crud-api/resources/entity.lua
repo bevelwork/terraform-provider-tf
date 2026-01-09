@@ -322,26 +322,53 @@ return {
       error(string.format('Cannot place entity "%s" at (%.1f, %.1f): position is water or cliff', config.name, position.x, position.y))
     end
     
-    -- Helper function to check if an entity is a resource (ore, coal, etc.) - don't clobber these
-    local function is_resource_entity(entity)
+    -- Helper function to check if an entity should be ignored/clobbered (ores, trees, stone)
+    -- These can be automatically removed when placing buildings
+    local function should_ignore_entity(entity)
       if entity == nil or not entity.valid then
+        return false
+      end
+      
+      local name = entity.name
+      
+      -- Check for ores (anything with "ore" in the name)
+      if string.find(name, "ore") ~= nil then
+        return true
+      end
+      
+      -- Check for trees (anything with "tree" in the name)
+      if string.find(name, "tree") ~= nil then
+        return true
+      end
+      
+      -- Check for stone
+      if name == "stone" or string.find(name, "stone") ~= nil then
+        return true
+      end
+      
+      return false
+    end
+    
+    -- Helper function to check if an entity is a resource that should be protected (not ores/trees/stone)
+    -- This is for resources like crude-oil that shouldn't be clobbered
+    local function is_protected_resource_entity(entity)
+      if entity == nil or not entity.valid then
+        return false
+      end
+      
+      -- If it should be ignored (ores/trees/stone), it's not protected
+      if should_ignore_entity(entity) then
         return false
       end
       
       -- Check entity type first (safest way)
       local success, entity_type = pcall(function() return entity.type end)
       if success and entity_type == "resource" then
-        return true
-      end
-      
-      -- Check by name for common resources
-      local name = entity.name
-      if name == "iron-ore" or name == "copper-ore" or name == "coal" or name == "stone" or name == "uranium-ore" or name == "crude-oil" then
-        return true
-      end
-      -- Check for resource patches (they often have names like "iron-ore", "copper-ore", etc.)
-      if string.find(name, "-ore") ~= nil then
-        return true
+        -- Only protect non-ore resources (like crude-oil)
+        local name = entity.name
+        if name == "crude-oil" then
+          return true
+        end
       end
       
       return false
@@ -453,8 +480,18 @@ return {
         local unit_number = conflicting_entity.unit_number
         local managed_entity = resource_db.get('entity', unit_number)
         
-        -- Never clobber resource entities (ores, coal, etc.)
-        if is_resource_entity(conflicting_entity) then
+        -- Check if entity should be ignored (ores, trees, stone) - these can be clobbered
+        if should_ignore_entity(conflicting_entity) then
+          -- Ores, trees, and stone can be automatically clobbered (unless on water/cliff)
+          if position_is_water_or_cliff then
+            -- Don't clobber on water/cliff
+            table.insert(unmanaged_conflicts, conflicting_entity)
+          else
+            -- Safe to clobber ores, trees, stone
+            table.insert(clobberable_conflicts, conflicting_entity)
+          end
+        elseif is_protected_resource_entity(conflicting_entity) then
+          -- Protected resources (like crude-oil) should not be clobbered
           table.insert(unmanaged_conflicts, conflicting_entity)
         elseif managed_entity ~= nil then
           -- This entity is managed by Terraform
@@ -508,8 +545,8 @@ return {
           local reason = ""
           if position_is_water_or_cliff then
             reason = " (position is water or cliff)"
-          elseif is_resource_entity(conflicting_entity) then
-            reason = " (resource entities cannot be automatically removed)"
+          elseif is_protected_resource_entity(conflicting_entity) then
+            reason = " (protected resource entity cannot be automatically removed)"
           end
           table.insert(conflict_msg_parts, string.format('please remove %s from (%.1f, %.1f)%s', entity_name, pos.x, pos.y, reason))
         end
