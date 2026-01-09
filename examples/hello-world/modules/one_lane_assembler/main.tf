@@ -33,9 +33,8 @@ resource "factorio_entity" "assembler" {
     x = each.value.x
     y = each.value.y
   }
-  contents {
+  recipe {
     kind = var.kind
-    qty  = 1
   }
 }
 

@@ -22,10 +22,13 @@ A LuaEntity in Factorio (https://lua-api.factorio.com/latest/LuaEntity.html), se
 
 ### Optional
 
+- **contents** (Block List) Items to place inside the entity (e.g., fuel in a burner mining drill). (see [below for nested schema](#nestedblock--contents))
 - **direction** (String) Which direction the LuaEntity faces.
 - **entity_specific_parameters** (Map of String) A map of additional entity-specific parameters to be passed to create_entity (https://lua-api.factorio.com/latest/LuaSurface.html#LuaSurface.create_entity)
 - **force** (String) The force of this LuaEntity, eg. "player", "enemy", "neutral" (https://lua-api.factorio.com/latest/LuaControl.html#LuaControl.force)
+- **force_replace** (Boolean) If true, automatically remove any non-Terraform-managed entities that collide with this resource's position.
 - **id** (String) The ID of this resource.
+- **recipe** (Block List, Max: 1) Recipe to set for crafting entities (e.g., assembly machines). (see [below for nested schema](#nestedblock--recipe))
 - **surface** (String) The LuaSurface on which the LuaEntity is placed (https://lua-api.factorio.com/latest/LuaSurface.html)
 
 ### Read-Only
@@ -39,5 +42,20 @@ Required:
 
 - **x** (Number)
 - **y** (Number)
+
+<a id="nestedblock--contents"></a>
+### Nested Schema for `contents`
+
+Required:
+
+- **kind** (String) The item name (e.g., 'wood', 'coal')
+- **qty** (Number) The quantity of the item
+
+<a id="nestedblock--recipe"></a>
+### Nested Schema for `recipe`
+
+Required:
+
+- **kind** (String) The recipe name (e.g., 'iron-gear-wheel', 'copper-cable')
 
 

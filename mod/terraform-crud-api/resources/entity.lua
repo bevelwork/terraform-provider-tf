@@ -118,15 +118,10 @@ end
 local function set_entity_recipe(e, recipe)
   -- Check if entity supports recipes (assembly machines, furnaces, etc.)
   if e.set_recipe ~= nil and recipe ~= nil and recipe.kind ~= nil then
-    -- Verify the recipe exists
-    local recipe_prototype = game.recipe_prototypes[recipe.kind]
-    if recipe_prototype == nil then
-      error(string.format('Recipe "%s" does not exist', recipe.kind))
-    end
-    -- Set the recipe
+    -- Set the recipe - Factorio will validate if the recipe exists and can be set
     local success = e.set_recipe(recipe.kind)
     if not success then
-      error(string.format('Failed to set recipe "%s" on entity "%s"', recipe.kind, e.name))
+      error(string.format('Failed to set recipe "%s" on entity "%s". The recipe may not exist or may not be craftable by this entity type.', recipe.kind, e.name))
     end
     return
   end
