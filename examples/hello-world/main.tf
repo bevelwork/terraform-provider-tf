@@ -1,47 +1,49 @@
 data "factorio_players" "all" {}
 
-resource "factorio_entity" "defense_turrets" {
-  for_each = merge([
-    for player_index, player in data.factorio_players.all.players : {
-      for direction, offset in {
-        #         "north" = { x = 0, y = -3 }
-        # "south" = { x = 0, y = 3 }
-        # "east"  = { x = 3, y = 0 }
-        # "west"  = { x = -3, y = 0 }
-        } : "${player_index}_${direction}" => {
-        x = player.position[0].x + offset.x
-        y = player.position[0].y + offset.y
-      }
-    }
-  ]...)
-
-  name = "gun-turret"
-  position {
-    x = each.value.x
-    y = each.value.y
-  }
-  lifecycle {
-    ignore_changes = [position]
-  }
-
-  # Load with advanced ammo (piercing rounds)
-  contents {
-    kind = "piercing-rounds-magazine"
-    qty  = 200 # Full stack of advanced ammo
-  }
-}
+# resource "factorio_entity" "defense_turrets" {
+#   for_each = merge([
+#     for player_index, player in data.factorio_players.all.players : {
+#       for direction, offset in {
+#         "north" = { x = 0, y = -3 }
+#         "south" = { x = 0, y = 3 }
+#         "east"  = { x = 3, y = 0 }
+#         "west"  = { x = -3, y = 0 }
+#         } : "${player_index}_${direction}" => {
+#         x = player.position[0].x + offset.x
+#         y = player.position[0].y + offset.y
+#       }
+#     }
+#   ]...)
+# 
+#   name = "gun-turret"
+#   position {
+#     x = each.value.x
+#     y = each.value.y
+#   }
+#   lifecycle {
+#     ignore_changes = [position]
+#   }
+# 
+#   # Load with advanced ammo (piercing rounds)
+#   contents {
+#     kind = "piercing-rounds-magazine"
+#     qty  = 200 # Full stack of advanced ammo
+#   }
+# }
 
 module "iron_extractor_farm" {
   source = "./modules/coal_extractor_farm"
   for_each = { for idx, vals in [
     { x = -42, y = 48 },
     { x = -37, y = 48 },
-    { x = -32, y = 48 },
+    { x = -31, y = 48 },
+    { x = -26, y = 48 },
   ] : idx => vals }
   x      = each.value.x
   y      = each.value.y
   height = 30
 }
+
 
 # resource "factorio_entity" "assembler_3x3" {
 #   for_each = { for i, val in [
@@ -92,14 +94,20 @@ module "iron_extractor_farm" {
 #   }
 # }
 
+module "iron_furnace" {
+  source = "./modules/furnace_stack"
+  for_each = { for idx, vals in [
+    { x = -39, y = 31 },
+    { x = -28, y = 31 },
+  ] : idx => vals }
+  x   = each.value.x
+  y   = each.value.y
+  qty = 5
+}
 
-
-
-# module "iron_furnace" {
-#   source = "./modules/furnace_stack"
-#   x      = -38.5
-#   y      = 31.5
-# }
+output "furnace_stack" {
+  value = module.iron_furnace
+}
 
 # module "copper_extractor_farm" {
 #   source = "./modules/coal_extractor_farm"
@@ -143,11 +151,15 @@ module "iron_extractor_farm" {
 #   height = 13
 # }
 
-# module "joiner" {
-#   source = "./modules/joiner"
-#   x      = -41
-#   y      = 34
-# }
+module "joiner" {
+  source = "./modules/joiner"
+  for_each = { for idx, vals in [
+    { x = -41, y = 34 },
+    { x = -30, y = 34 },
+  ] : idx => vals }
+  x = each.value.x
+  y = each.value.y
+}
 
 ## JOINER
 # resource "factorio_entity" "feed_joiner" {

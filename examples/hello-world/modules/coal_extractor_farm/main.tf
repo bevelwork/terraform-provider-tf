@@ -31,6 +31,10 @@ resource "factorio_entity" "mining_drill_left" {
     kind = "coal"
     qty  = 50
   }
+
+  lifecycle {
+    ignore_changes = [position]
+  }
 }
 resource "factorio_entity" "mining_drill_right" {
   for_each = { for idx in range(0, var.height) : idx =>
@@ -48,6 +52,9 @@ resource "factorio_entity" "mining_drill_right" {
   contents {
     kind = "coal"
     qty  = 20
+  }
+  lifecycle {
+    ignore_changes = [position]
   }
 }
 
