@@ -59,6 +59,15 @@ resource "factorio_entity" "right_belt" {
   direction = "north"
 }
 
+resource "factorio_entity" "extra_belt_output" {
+  name = "express-transport-belt"
+  position {
+    x = var.x + 6
+    y = var.y - var.qty * 3 - 1
+  }
+  direction = "north"
+}
+
 locals {
   inserter_offsets = [
     { x = var.x + 1, y = var.y - 1 },
@@ -87,6 +96,7 @@ resource "factorio_entity" "inserters" {
 locals {
   electric_pole_offsets = [
     { x = var.x + 1, y = var.y },
+    { x = var.x + 5, y = var.y },
   ]
   electric_pole_positions = merge([
     for i in range(0, var.qty) : { for j, val in local.electric_pole_offsets : "${i}_${j}" =>
